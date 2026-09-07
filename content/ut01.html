@@ -1,0 +1,94 @@
+<section id="ut01">
+<h2>1 · Nomenclatura náutica</h2>
+<p class="eyebrow">4 preguntas · sin mínimo propio</p>
+
+<p>Esta unidad es vocabulario puro, y por eso mismo se pierden puntos tontos: la mitad de los fallos vienen de confundir pares de términos que se parecen. Empieza por fijar el casco y las dimensiones, que es de donde salen la mayoría de las preguntas.</p>
+
+<h3>El casco</h3>
+<p>El casco es el cuerpo estanco de la embarcación. Se divide por la línea de flotación en dos partes que hay que tener clarísimas:</p>
+<ul>
+  <li><strong>Obra viva</strong> o <strong>carena</strong>: la parte sumergida, por debajo de la línea de flotación.</li>
+  <li><strong>Obra muerta</strong>: la parte emergida, desde la flotación hasta la borda.</li>
+</ul>
+<p>La <strong>línea de flotación</strong> es la intersección de la superficie del agua con el casco. No es fija: sube al cargar y baja al descargar. La marca pintada que la señala se llama <strong>línea de máxima carga</strong>.</p>
+
+<figure>
+<svg viewBox="0 0 640 300" role="img" aria-label="Sección longitudinal de una embarcación con sus dimensiones principales">
+  <rect x="0" y="0" width="640" height="300" fill="var(--papel)"/>
+  <!-- agua -->
+  <rect x="0" y="185" width="640" height="115" fill="var(--sonda)" opacity=".55"/>
+  <!-- casco -->
+  <path d="M90,120 L520,120 Q560,120 570,150 L560,215 Q555,240 520,240 L150,240 Q100,240 90,200 Z"
+        fill="var(--papel-2)" stroke="var(--tinta)" stroke-width="2"/>
+  <!-- linea de flotacion -->
+  <line x1="40" y1="185" x2="610" y2="185" stroke="var(--derrota)" stroke-width="1.6" stroke-dasharray="7 4"/>
+  <text x="46" y="180" font-family="Archivo" font-size="12" fill="var(--derrota)">línea de flotación</text>
+  <!-- cubierta -->
+  <line x1="90" y1="120" x2="570" y2="120" stroke="var(--tinta)" stroke-width="2"/>
+  <text x="300" y="112" font-family="Archivo" font-size="12" fill="var(--tinta)" text-anchor="middle">cubierta</text>
+  <!-- etiquetas obra viva/muerta -->
+  <text x="300" y="158" font-family="Archivo" font-size="13" fill="var(--tinta-70)" text-anchor="middle">obra muerta</text>
+  <text x="300" y="215" font-family="Archivo" font-size="13" fill="var(--tinta-70)" text-anchor="middle">obra viva (carena)</text>
+  <!-- proa / popa -->
+  <text x="600" y="150" font-family="Archivo" font-size="12" fill="var(--tinta)">proa</text>
+  <text x="52" y="150" font-family="Archivo" font-size="12" fill="var(--tinta)">popa</text>
+  <!-- eslora -->
+  <line x1="90" y1="272" x2="570" y2="272" stroke="var(--tinta)" stroke-width="1" marker-start="url(#f1)" marker-end="url(#f1)"/>
+  <text x="330" y="288" font-family="Archivo" font-size="12" fill="var(--tinta)" text-anchor="middle">eslora</text>
+  <!-- puntal y calado -->
+  <line x1="618" y1="120" x2="618" y2="240" stroke="var(--tinta)" stroke-width="1"/>
+  <text x="626" y="165" font-family="Archivo" font-size="12" fill="var(--tinta)">puntal</text>
+  <line x1="70" y1="185" x2="70" y2="240" stroke="var(--estribor)" stroke-width="1.8"/>
+  <text x="14" y="230" font-family="Archivo" font-size="12" fill="var(--estribor)">calado</text>
+  <defs><marker id="f1" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="6" markerHeight="6"><circle cx="4" cy="4" r="2.5" fill="var(--tinta)"/></marker></defs>
+</svg>
+<figcaption>Puntal y calado se miden en la misma vertical pero desde referencias distintas: el puntal desde la cubierta, el calado desde la flotación.</figcaption>
+</figure>
+
+<h3>Dimensiones</h3>
+<table>
+  <thead><tr><th>Dimensión</th><th>Qué mide</th></tr></thead>
+  <tbody>
+    <tr><td>Eslora</td><td>Longitud de proa a popa. Es la que fija tus atribuciones: el PER llega a 15 m, o a 24 m con las prácticas complementarias.</td></tr>
+    <tr><td>Manga</td><td>Anchura máxima.</td></tr>
+    <tr><td>Puntal</td><td>Altura del casco medida desde la quilla hasta la cubierta.</td></tr>
+    <tr><td>Calado</td><td>Distancia desde la flotación hasta la parte más baja del casco. Es lo que determina si tocas fondo.</td></tr>
+    <tr><td>Francobordo</td><td>Distancia desde la flotación hasta la cubierta. Puntal menos calado.</td></tr>
+    <tr><td>Desplazamiento</td><td>Peso del agua desplazada, es decir, el peso real de la embarcación.</td></tr>
+    <tr><td>Arqueo</td><td>Volumen interior, expresado en unidades de arqueo (GT). No es un peso.</td></tr>
+  </tbody>
+</table>
+
+<div class="nota">
+  <b>La confusión típica</b>
+  <p>Desplazamiento es <em>peso</em>; arqueo es <em>volumen</em>. Y puntal se mide desde la quilla, calado desde la flotación: si te preguntan "distancia entre la línea de flotación y la parte inferior de la quilla", es calado.</p>
+</div>
+
+<h3>Estructura</h3>
+<ul>
+  <li><strong>Quilla</strong>: la pieza longitudinal de la parte baja, la espina dorsal del casco.</li>
+  <li><strong>Roda</strong>: prolongación de la quilla hacia proa. <strong>Codaste</strong>: hacia popa.</li>
+  <li><strong>Cuadernas</strong>: las piezas transversales que dan forma; son las costillas.</li>
+  <li><strong>Baos</strong>: refuerzos transversales que sostienen la cubierta.</li>
+  <li><strong>Varengas</strong>: refuerzos transversales en el fondo, que unen las cuadernas de una banda con las de la otra.</li>
+  <li><strong>Mamparos</strong>: tabiques que dividen el interior; los estancos también compartimentan el casco frente a una vía de agua.</li>
+  <li><strong>Amuras</strong>: las partes curvas del costado próximas a proa. <strong>Aletas</strong>: las próximas a popa.</li>
+  <li><strong>Través</strong>: la dirección perpendicular a la línea proa-popa.</li>
+  <li><strong>Sentina</strong>: la zona más baja del interior, donde se acumula el agua.</li>
+  <li><strong>Espejo de popa</strong>: la superficie plana que cierra la popa, donde suele ir el motor fueraborda.</li>
+</ul>
+
+<h3>Bandas y direcciones</h3>
+<p><strong>Estribor</strong> es la banda derecha mirando hacia proa; <strong>babor</strong>, la izquierda. La luz de estribor es verde y la de babor, roja: el mismo par de colores que verás en luces de navegación y en balizamiento lateral, así que fíjalo ahora de una vez.</p>
+<p>De proa hacia popa las direcciones se nombran así: proa, amura, través, aleta, popa. Una marcación de 45° por estribor es "por la amura de estribor"; una de 135°, "por la aleta de estribor".</p>
+
+<h3>Propulsión y gobierno</h3>
+<p>La <strong>hélice</strong> transforma el giro del eje en empuje. Se define por el número de palas, el diámetro y el <strong>paso</strong>, que es la distancia teórica que avanzaría en una vuelta completa si el agua fuera sólida. La diferencia entre ese avance teórico y el real es el <strong>retroceso</strong>.</p>
+<p>Una hélice es <strong>dextrógira</strong> si, vista desde popa y navegando avante, gira en el sentido de las agujas del reloj. Este detalle importa porque determina hacia dónde te cae la popa al dar atrás, algo que sale tanto aquí como en Maniobra.</p>
+<p>El <strong>timón</strong> gobierna la embarcación por la presión del agua sobre la <strong>pala</strong>. Solo funciona con agua en movimiento sobre ella: sin arrancada no hay gobierno, salvo que des un golpe de máquina para generar flujo. La <strong>mecha</strong> es el eje del timón y la <strong>caña</strong> o la rueda es lo que manejas.</p>
+
+<div class="nota examen">
+  <b>De aquí salen preguntas casi seguras</b>
+  <p>Obra viva y obra muerta; la diferencia puntal / calado / francobordo; desplazamiento frente a arqueo; qué es el paso de la hélice; y la posición de amuras y aletas.</p>
+</div>
+</section>

@@ -1,0 +1,171 @@
+[
+  {
+    "id": "c1",
+    "tecnica": "Corrección total",
+    "enunciado": "Navegas con un rumbo de aguja de 127°. La carta da una declinación magnética de 2° W y la tablilla de desvíos indica 3° E para ese rumbo. ¿Cuál es el rumbo verdadero que debes trazar en la carta?",
+    "unidad": "°",
+    "respuesta": 128,
+    "tolerancia": 0.5,
+    "solucion": [
+      "Nombra los signos: al este suman, al oeste restan. dm = 2° W = −2°. Δ = 3° E = +3°.",
+      "Ct = dm + Δ = −2 + 3 = +1°.",
+      "Rv = Ra + Ct = 127 + 1 = 128°.",
+      "El rumbo que trazas en la carta es 128°."
+    ]
+  },
+  {
+    "id": "c2",
+    "tecnica": "Corrección total",
+    "enunciado": "Has trazado en la carta un rumbo verdadero de 310°. La declinación es 4° E y el desvío para ese rumbo es 1° W. ¿Qué rumbo de aguja debes ordenar al timonel?",
+    "unidad": "°",
+    "respuesta": 307,
+    "tolerancia": 0.5,
+    "solucion": [
+      "Ct = dm + Δ = (+4) + (−1) = +3°.",
+      "Vas de la carta al compás, así que recorres la cadena al revés: Ra = Rv − Ct.",
+      "Ra = 310 − 3 = 307°.",
+      "Comprueba la lógica: con corrección total positiva, el rumbo de aguja siempre es menor que el verdadero."
+    ]
+  },
+  {
+    "id": "c3",
+    "tecnica": "Declinación actualizada",
+    "enunciado": "La rosa de la carta indica: declinación magnética 3° 20' W en 2018, disminuyendo 7' anuales. ¿Cuál es la declinación en 2026, expresada en minutos de arco al oeste?",
+    "unidad": "' W",
+    "respuesta": 144,
+    "tolerancia": 1,
+    "solucion": [
+      "Años transcurridos: 2026 − 2018 = 8.",
+      "Variación acumulada: 8 × 7' = 56'.",
+      "La declinación disminuye, así que se resta del valor de la rosa: 3° 20' = 200'. 200' − 56' = 144'.",
+      "144' = 2° 24' W. Para los cálculos, dm = −2,4°."
+    ]
+  },
+  {
+    "id": "c4",
+    "tecnica": "Demoras y marcaciones",
+    "enunciado": "Navegas al rumbo verdadero 065°. Tomas un faro con una marcación de 40° por babor. ¿Cuál es la demora verdadera al faro?",
+    "unidad": "°",
+    "respuesta": 25,
+    "tolerancia": 0.5,
+    "solucion": [
+      "Marcación por babor: se resta. Marcación por estribor: se suma.",
+      "Demora = Rumbo − marcación de babor = 065 − 40 = 025°.",
+      "Traza esa recta desde el faro hacia el mar: es tu línea de posición."
+    ]
+  },
+  {
+    "id": "c5",
+    "tecnica": "Demoras y marcaciones",
+    "enunciado": "Navegas al rumbo verdadero 200° y tomas demora verdadera 245° a una punta. ¿Cuál es la marcación, en grados y por qué banda? Introduce solo el número de grados.",
+    "unidad": "°",
+    "respuesta": 45,
+    "tolerancia": 0.5,
+    "solucion": [
+      "Marcación = Demora − Rumbo = 245 − 200 = +45.",
+      "Resultado positivo, luego el objeto queda por estribor.",
+      "Marcación 45° por estribor, es decir, por la amura de estribor."
+    ]
+  },
+  {
+    "id": "c6",
+    "tecnica": "Velocidad, tiempo y distancia",
+    "enunciado": "Tienes que recorrer 22 millas a una velocidad de 8,5 nudos. ¿Cuántos minutos tardarás? Redondea al minuto.",
+    "unidad": "min",
+    "respuesta": 155,
+    "tolerancia": 2,
+    "solucion": [
+      "t = D / V = 22 / 8,5 = 2,588 horas.",
+      "Pasa la parte decimal a minutos: 0,588 × 60 = 35,3 min.",
+      "Tiempo total: 2 h 35 min = 155 minutos.",
+      "Si salieras a las 09:20, llegarías a las 11:55."
+    ]
+  },
+  {
+    "id": "c7",
+    "tecnica": "Situación de estima",
+    "enunciado": "Sales de un punto situado en 36° 00,0' N y navegas al rumbo verdadero 045° a 10 nudos durante 1 h 30 min. ¿Cuál es la latitud de llegada, en minutos al norte de 36°? Da el resultado con una decimal.",
+    "unidad": "'",
+    "respuesta": 10.6,
+    "tolerancia": 0.4,
+    "solucion": [
+      "Distancia navegada: D = V × t = 10 × 1,5 = 15 millas.",
+      "La diferencia de latitud es la proyección norte-sur de esa distancia: Δl = D × cos(Rv).",
+      "Δl = 15 × cos 45° = 15 × 0,7071 = 10,6 millas, y como una milla equivale a un minuto de latitud, Δl = 10,6'.",
+      "Latitud de llegada: 36° 00,0' + 10,6' = 36° 10,6' N.",
+      "En el examen esto se resuelve directamente con el compás de puntas sobre la carta; el cálculo sirve para comprobar."
+    ]
+  },
+  {
+    "id": "c8",
+    "tecnica": "Situación de estima",
+    "enunciado": "Continuando el ejercicio anterior, sales de 005° 30,0' W. ¿Cuál es la longitud de llegada, en minutos al este de 005° 30,0' W? Da el resultado con una decimal.",
+    "unidad": "'",
+    "respuesta": 13.1,
+    "tolerancia": 0.6,
+    "solucion": [
+      "El apartamiento es la proyección este-oeste: A = D × sen(Rv) = 15 × 0,7071 = 10,6 millas.",
+      "Los minutos de longitud son más cortos que la milla: ΔL = A / cos(latitud media).",
+      "Latitud media ≈ 36° 05', cuyo coseno es 0,808.",
+      "ΔL = 10,6 / 0,808 = 13,1' hacia el este.",
+      "Longitud de llegada: 005° 30,0' − 13,1' = 005° 16,9' W. Restas porque vas hacia el este y estás en longitud oeste."
+    ]
+  },
+  {
+    "id": "c9",
+    "tecnica": "Rumbo y distancia entre dos puntos",
+    "enunciado": "Quieres ir de A (36° 00,0' N, 005° 20,0' W) a B (36° 12,0' N, 005° 00,0' W). ¿Cuál es la distancia en millas? Da el resultado con una decimal.",
+    "unidad": "M",
+    "respuesta": 20.1,
+    "tolerancia": 0.8,
+    "solucion": [
+      "Δl = 12' hacia el norte, que son 12 millas.",
+      "ΔL = 20' hacia el este. Conviértelo en apartamiento: A = ΔL × cos(latitud media 36° 06') = 20 × 0,808 = 16,2 millas.",
+      "Distancia = √(12² + 16,2²) = √(144 + 262) = 20,1 millas.",
+      "Sobre la carta bastaría con abrir el compás de puntas entre A y B y llevarlo a la escala de latitudes."
+    ]
+  },
+  {
+    "id": "c10",
+    "tecnica": "Rumbo y distancia entre dos puntos",
+    "enunciado": "Con los mismos puntos A y B del ejercicio anterior, ¿cuál es el rumbo verdadero de A a B? Redondea al grado.",
+    "unidad": "°",
+    "respuesta": 53,
+    "tolerancia": 1.5,
+    "solucion": [
+      "Rv = arco tangente de (apartamiento / diferencia de latitud) = arctg (16,2 / 12).",
+      "arctg 1,35 = 53,4°.",
+      "Como vas hacia el norte y hacia el este, el rumbo está en el primer cuadrante: 053°.",
+      "Regla de comprobación: si el resultado no cuadra con el cuadrante (NE, SE, SW, NW) al que te diriges, has invertido algún signo."
+    ]
+  },
+  {
+    "id": "c11",
+    "tecnica": "Marea y sonda real",
+    "enunciado": "Bajamar a las 06:00 con 0,5 m de altura; pleamar a las 12:00 con 3,5 m. La sonda de la carta en tu punto es 2,2 m. ¿Cuál será la sonda real a las 09:00? Da el resultado en metros con una decimal.",
+    "unidad": "m",
+    "respuesta": 4.2,
+    "tolerancia": 0.15,
+    "solucion": [
+      "Carrera de marea: 3,5 − 0,5 = 3,0 m. Un doceavo = 0,25 m.",
+      "De 06:00 a 09:00 han pasado 3 horas: primera hora 1/12, segunda 2/12, tercera 3/12. Acumulado 6/12.",
+      "Ascenso: 6 × 0,25 = 1,5 m. Altura de marea a las 09:00 = 0,5 + 1,5 = 2,0 m.",
+      "Sonda real = sonda de la carta + altura de la marea = 2,2 + 2,0 = 4,2 m.",
+      "Con 1,6 m de calado te quedarían 2,6 m bajo la quilla."
+    ]
+  },
+  {
+    "id": "c12",
+    "tecnica": "Marea y sonda real",
+    "enunciado": "Mismos datos de marea del ejercicio anterior. Tu calado es 2,4 m y quieres cruzar un bajo con sonda cartografiada de 1,0 m dejando al menos 0,5 m bajo la quilla. ¿Qué altura de marea mínima necesitas, en metros con una decimal?",
+    "unidad": "m",
+    "respuesta": 1.9,
+    "tolerancia": 0.15,
+    "solucion": [
+      "Necesitas una sonda real de: calado + margen = 2,4 + 0,5 = 2,9 m.",
+      "Altura de marea necesaria = sonda real requerida − sonda de la carta = 2,9 − 1,0 = 1,9 m.",
+      "Con una carrera de 3,0 m sobre una bajamar de 0,5 m, esa altura corresponde a 1,4 m de ascenso, es decir, algo más de 5,6 doceavos: pasarás con seguridad a partir de unas tres horas después de la bajamar.",
+      "Este es el tipo de razonamiento que espera el examen: no basta con calcular la marea, hay que decidir si se pasa."
+    ]
+  }
+]

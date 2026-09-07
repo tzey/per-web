@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador · PER</title>
+<meta name="theme-color" content="#10202B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" data-rail></nav>
+  <main>
+
+    <!-- ---------- Configuración ---------- -->
+    <section id="config">
+      <p class="eyebrow">45 preguntas · 90 minutos</p>
+      <h1>Simulador del examen</h1>
+      <p class="entradilla">Dos modelos completos con la distribución oficial por unidad. La corrección aplica el baremo real, incluidos los mínimos de Balizamiento, RIPA y Carta.</p>
+
+      <h2>Modelo</h2>
+      <div class="barra" role="radiogroup" aria-label="Modelo de examen">
+        <button class="btn sec" data-modelo="a" aria-pressed="true">Modelo A</button>
+        <button class="btn sec" data-modelo="b" aria-pressed="false">Modelo B</button>
+      </div>
+
+      <h2>Modo</h2>
+      <div class="barra" role="radiogroup" aria-label="Modo">
+        <button class="btn sec" data-modo="examen" aria-pressed="true">Examen</button>
+        <button class="btn sec" data-modo="repaso" aria-pressed="false">Repaso</button>
+      </div>
+      <p id="descModo" style="font-size:.95rem;color:var(--tinta-70)"></p>
+
+      <p>
+        <label style="font-family:var(--sans);font-size:.92rem;display:inline-flex;gap:.5rem;align-items:center">
+          <input type="checkbox" id="barajar" checked style="accent-color:var(--derrota)">
+          Barajar el orden de las opciones
+        </label>
+      </p>
+
+      <p style="margin-top:1.6rem"><button class="btn acc" id="empezar">Empezar</button></p>
+    </section>
+
+    <!-- ---------- Examen ---------- -->
+    <section id="examen" hidden>
+      <div class="test-cab">
+        <strong id="etiqueta"></strong>
+        <span class="reloj" id="reloj">90:00</span>
+        <span class="progreso"><i id="barra" style="width:0"></i></span>
+        <span id="contador" class="mono"></span>
+        <button class="btn acc" id="entregar">Entregar</button>
+        <button class="btn sec" id="salir">Salir</button>
+      </div>
+      <div id="listado"></div>
+      <p><button class="btn acc" id="entregar2">Entregar examen</button></p>
+    </section>
+
+    <!-- ---------- Resultado ---------- -->
+    <section id="resultado" hidden></section>
+
+    <footer class="pie">
+      <p>Los resultados se guardan solo en este navegador. Las preguntas son de elaboración propia siguiendo el contenido del Anexo II; no reproducen exámenes oficiales.</p>
+    </footer>
+  </main>
+</div>
+
+<script type="module">
+import { pintarRail, corregir, progreso, BAREMO, UNIDADES, hhmmss } from './assets/js/comun.js';
+pintarRail('test.html');
+
+const $ = s => document.querySelector(s);
+const estado = { modelo: 'a', modo: 'examen', preguntas: [], respuestas: {}, timer: null, restante: 0 };
+
+const TEXTOS = {
+  examen: 'Cronómetro de 90 minutos y sin corrección hasta entregar. Es la única forma de saber si llegas de tiempo con la carta.',
+  repaso: 'Cada respuesta se corrige al instante y muestra la explicación. Sin reloj.'
+};
+
+function seleccionar(attr, valor) {
+  document.querySelectorAll(`[data-${attr}]`).forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset[attr] === valor)));
+}
+document.querySelectorAll('[data-modelo]').forEach(b => b.onclick = () => {
+  estado.modelo = b.dataset.modelo; seleccionar('modelo', estado.modelo);
+});
+document.querySelectorAll('[data-modo]').forEach(b => b.onclick = () => {
+  estado.modo = b.dataset.modo; seleccionar('modo', estado.modo); $('#descModo').textContent = TEXTOS[estado.modo];
+});
+$('#descModo').textContent = TEXTOS.examen;
+
+const mezclar = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(v => v[1]);
+
+$('#empezar').onclick = async () => {
+  const datos = await fetch(`data/modelo-${estado.modelo}.json`).then(r => r.json()).catch(() => null);
+  if (!datos) { alert('No se ha podido cargar el modelo. Arranca el sitio desde un servidor local.'); return; }
+
+  estado.preguntas = datos.preguntas.map(p => {
+    if (!$('#barajar').checked) return { ...p, orden: p.o.map((_, i) => i) };
+    const orden = mezclar(p.o.map((_, i) => i));
+    return { ...p, orden };
+  });
+  estado.respuestas = {};
+  $('#config').hidden = true;
+  $('#examen').hidden = false;
+  $('#etiqueta').textContent = `Modelo ${datos.modelo} · ${estado.modo === 'examen' ? 'examen' : 'repaso'}`;
+  pintarPreguntas();
+  if (estado.modo === 'examen') arrancarReloj(); else { $('#reloj').textContent = '—'; }
+  window.scrollTo(0, 0);
+};
+
+function pintarPreguntas() {
+  const nombre = Object.fromEntries(UNIDADES.map(u => [u.id, `UT ${u.n} · ${u.titulo}`]));
+  $('#listado').innerHTML = estado.preguntas.map((p, i) => `
+    <div class="pregunta" data-id="${p.id}">
+      <div class="meta"><span class="mono">${String(i + 1).padStart(2, '0')}</span><span>${nombre[p.ut]}</span></div>
+      <p class="enunciado">${p.p}</p>
+      <ul class="opciones">
+        ${p.orden.map((idx, pos) => `
+          <li data-idx="${idx}">
+            <label>
+              <input type="radio" name="${p.id}" value="${idx}">
+              <span class="letra">${'abcd'[pos]}</span><span>${p.o[idx]}</span>
+            </label>
+          </li>`).join('')}
+      </ul>
+      <div class="explica" hidden data-explica>${p.e}<span class="ref">${p.ref}</span></div>
+    </div>`).join('');
+
+  $('#listado').addEventListener('change', ev => {
+    if (ev.target.type !== 'radio') return;
+    const bloque = ev.target.closest('[data-id]');
+    const p = estado.preguntas.find(x => x.id === bloque.dataset.id);
+    estado.respuestas[p.id] = +ev.target.value;
+    actualizarContador();
+    if (estado.modo === 'repaso') revelar(bloque, p);
+  });
+  actualizarContador();
+}
+
+function revelar(bloque, p) {
+  bloque.querySelectorAll('input').forEach(i => i.disabled = true);
+  bloque.querySelectorAll('li').forEach(li => {
+    const idx = +li.dataset.idx;
+    if (idx === p.correcta) li.classList.add('correcta');
+    else if (idx === estado.respuestas[p.id]) li.classList.add('fallada');
+  });
+  bloque.querySelector('[data-explica]').hidden = false;
+}
+
+function actualizarContador() {
+  const n = Object.keys(estado.respuestas).length;
+  $('#contador').textContent = `${n}/${estado.preguntas.length}`;
+  $('#barra').style.width = `${n / estado.preguntas.length * 100}%`;
+}
+
+function arrancarReloj() {
+  estado.restante = BAREMO.minutos * 60;
+  const pinta = () => {
+    $('#reloj').textContent = hhmmss(estado.restante);
+    $('#reloj').classList.toggle('urgente', estado.restante <= 300);
+  };
+  pinta();
+  estado.timer = setInterval(() => {
+    estado.restante--;
+    pinta();
+    if (estado.restante <= 0) { clearInterval(estado.timer); entregar(true); }
+  }, 1000);
+}
+
+function entregar(porTiempo = false) {
+  clearInterval(estado.timer);
+  const sinResponder = estado.preguntas.length - Object.keys(estado.respuestas).length;
+  if (!porTiempo && sinResponder > 0 &&
+      !confirm(`Quedan ${sinResponder} preguntas sin responder y las blancas cuentan como error. ¿Entregar igualmente?`)) return;
+
+  const r = corregir(estado.preguntas, estado.respuestas);
+  progreso.registrarIntento({ modelo: estado.modelo.toUpperCase(), modo: estado.modo, aciertos: r.aciertos, total: estado.preguntas.length, apto: r.apto });
+
+  $('#examen').hidden = true;
+  $('#resultado').hidden = false;
+  $('#resultado').innerHTML = `
+    <div class="veredicto ${r.apto ? 'apto' : 'no-apto'}">
+      <h2>${r.apto ? 'Apto' : 'No apto'}</h2>
+      <p class="cifra">${r.aciertos}<span style="font-size:1rem;font-family:var(--sans)"> aciertos de ${estado.preguntas.length}</span></p>
+      <p style="margin:.6rem 0 0">${r.errores} errores. El límite son ${BAREMO.erroresMaximos}.
+      ${porTiempo ? ' Se acabó el tiempo.' : ''}</p>
+      ${r.motivo ? `<p style="margin:.4rem 0 0"><strong>${r.motivo}</strong></p>` : ''}
+    </div>
+
+    <h2>Desglose por unidad</h2>
+    <table class="desglose">
+      <thead><tr><th>Unidad</th><th class="num">Aciertos</th><th class="num">Fallos</th><th class="num">Mínimo</th></tr></thead>
+      <tbody>${r.desglose.map(u => `
+        <tr class="${u.minimo !== null ? 'limite' : ''}">
+          <th>UT ${u.n} · ${u.titulo}</th>
+          <td class="num ${u.minimo !== null && u.aciertos < u.minimo ? 'mal' : 'ok'}">${u.aciertos}/${u.preguntas}</td>
+          <td class="num">${u.fallos}</td>
+          <td class="num">${u.minimo ?? '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+
+    <div class="barra">
+      <button class="btn" id="revisar">Revisar respuestas</button>
+      <a class="btn sec" href="test.html">Otro simulacro</a>
+      <a class="btn sec" href="temario.html">Volver al temario</a>
+    </div>
+    <div id="revision"></div>`;
+
+  $('#revisar').onclick = () => {
+    const nombre = Object.fromEntries(UNIDADES.map(u => [u.id, `UT ${u.n} · ${u.titulo}`]));
+    $('#revision').innerHTML = '<h2>Revisión</h2>' + estado.preguntas.map((p, i) => {
+      const dada = estado.respuestas[p.id];
+      const bien = dada === p.correcta;
+      return `<div class="pregunta">
+        <div class="meta"><span class="mono">${String(i + 1).padStart(2, '0')}</span><span>${nombre[p.ut]}</span>
+          <span style="color:${bien ? 'var(--estribor)' : 'var(--babor)'}">${bien ? 'acierto' : (dada === undefined ? 'en blanco' : 'fallo')}</span></div>
+        <p class="enunciado">${p.p}</p>
+        <ul class="opciones">${p.orden.map((idx, pos) => `
+          <li class="${idx === p.correcta ? 'correcta' : (idx === dada ? 'fallada' : '')}">
+            <label><span class="letra">${'abcd'[pos]}</span><span>${p.o[idx]}</span></label>
+          </li>`).join('')}</ul>
+        <div class="explica">${p.e}<span class="ref">${p.ref}</span></div>
+      </div>`;
+    }).join('');
+    $('#revisar').disabled = true;
+    document.getElementById('revision').scrollIntoView({ behavior: 'smooth' });
+  };
+  window.scrollTo(0, 0);
+}
+
+$('#entregar').onclick = () => entregar();
+$('#entregar2').onclick = () => entregar();
+$('#salir').onclick = () => { if (confirm('Se perderán las respuestas de este simulacro. ¿Salir?')) location.reload(); };
+window.addEventListener('beforeunload', e => {
+  if (!$('#examen').hidden && Object.keys(estado.respuestas).length) { e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+</body>
+</html>

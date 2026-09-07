@@ -1,0 +1,104 @@
+<section id="ut10">
+<h2>10 · Teoría de navegación</h2>
+<p class="eyebrow">5 preguntas · sin mínimo propio</p>
+
+<p>Esta unidad es la base teórica del ejercicio de carta. Si la entiendes bien, la UT 11 deja de ser memoria y pasa a ser mecánica.</p>
+
+<h3>La esfera terrestre</h3>
+<ul>
+  <li><strong>Ecuador</strong>: círculo máximo perpendicular al eje terrestre. Divide la Tierra en dos hemisferios y es el origen de las latitudes.</li>
+  <li><strong>Paralelos</strong>: círculos menores paralelos al ecuador.</li>
+  <li><strong>Meridianos</strong>: semicírculos máximos que van de polo a polo. El de origen es el de <strong>Greenwich</strong>.</li>
+</ul>
+
+<h3>Coordenadas</h3>
+<p>La <strong>latitud</strong> (l) es el arco de meridiano entre el ecuador y el punto, de <strong>0° a 90°</strong>, contado N o S. La <strong>longitud</strong> (L) es el arco de ecuador entre el meridiano de Greenwich y el del punto, de <strong>0° a 180°</strong>, contado E o W.</p>
+<p>Se expresan en grados, minutos y décimas de minuto: <span class="mono">36° 07,4' N — 005° 22,8' W</span>. Un grado tiene 60 minutos.</p>
+
+<div class="nota examen">
+  <b>La equivalencia que lo sostiene todo</b>
+  <p><strong>Un minuto de latitud equivale a una milla náutica</strong> (1852 m). Por eso las distancias en la carta se miden <em>siempre</em> en la escala de latitudes del margen lateral, y nunca en la de longitudes: los minutos de longitud solo miden una milla en el ecuador y se van acortando hacia los polos.</p>
+</div>
+
+<p>La <strong>diferencia de latitud</strong> (Δl) y la <strong>diferencia de longitud</strong> (ΔL) entre dos puntos se restan si son del mismo signo y se suman si son de signos contrarios. El <strong>apartamiento</strong> es la distancia este-oeste medida sobre un paralelo, y no coincide con ΔL salvo en el ecuador.</p>
+
+<h3>Velocidad y distancia</h3>
+<p>El <strong>nudo</strong> es una milla náutica por hora. De ahí sale la única fórmula que necesitas manejar en tres direcciones:</p>
+<div class="formula">D = V × t        V = D / t        t = D / V
+
+con D en millas, V en nudos y t en horas.
+36 minutos = 0,6 h · 45 minutos = 0,75 h · 20 minutos = 0,333 h</div>
+<p>Convertir bien los minutos a fracción de hora es donde se pierden los puntos, no en la fórmula.</p>
+
+<h3>El horizonte y los rumbos</h3>
+<p>Los rumbos se cuentan de <strong>000° a 360°</strong> desde el norte y en el sentido de las agujas del reloj (circular). El <strong>rumbo</strong> es el ángulo entre el norte y la proa; la <strong>demora</strong> es el ángulo entre el norte y la línea que une tu posición con un objeto.</p>
+<p>La <strong>marcación</strong> es el ángulo entre la proa y el objeto, contado de 0° a 180° a una y otra banda. La relación es directa:</p>
+<div class="formula">Demora = Rumbo + Marcación (estribor)
+Demora = Rumbo − Marcación (babor)</div>
+<p>Una <strong>enfilación</strong> es la línea que se obtiene cuando dos objetos de la costa se ven alineados: da una línea de posición exactísima y sin error de compás. Una <strong>oposición</strong> es cuando esos dos objetos se ven en direcciones opuestas desde el barco.</p>
+
+<h3>Corrección total</h3>
+<p>La aguja magnética no apunta al norte geográfico por dos motivos acumulados:</p>
+<ul>
+  <li><strong>Declinación magnética (dm)</strong>: diferencia entre el norte verdadero y el magnético. Depende del lugar y varía con los años. La carta la indica en la rosa, con su valor, su año y su variación anual.</li>
+  <li><strong>Desvío de la aguja (Δ)</strong>: error propio de <em>tu</em> compás por el magnetismo del barco. Depende del rumbo, y se recoge en una tablilla de desvíos.</li>
+</ul>
+<div class="formula">Ct = dm + Δ          Rv = Ra + Ct
+
+Nombradas al este → signo +
+Nombradas al oeste → signo −</div>
+
+<p>La cadena completa, del instrumento a la carta:</p>
+<div class="formula">Ra  (rumbo de aguja)
+ +Δ
+Rm  (rumbo magnético)
+ +dm
+Rv  (rumbo verdadero)   ← este es el que se traza en la carta
+ +Ab
+Rs  (rumbo de superficie, con abatimiento)</div>
+
+<p>Para pasar de la carta al timón se recorre al revés, restando. Un error de signo aquí arrastra el ejercicio entero de carta, así que conviene escribir siempre el esquema antes de calcular.</p>
+
+<h4>Actualizar la declinación</h4>
+<p>La rosa da un valor referido a un año concreto y una variación anual. Se multiplica la variación por los años transcurridos y se aplica en el sentido indicado.</p>
+<div class="formula">Rosa: dm 2° 30' W (2020), disminuye 8' al año.
+Para 2026: 6 años × 8' = 48'
+dm = 2° 30' − 48' = 1° 42' W  →  dm = −1,7°</div>
+
+<h3>Abatimiento y deriva</h3>
+<p>Son dos cosas distintas y el examen las cruza:</p>
+<ul>
+  <li><strong>Abatimiento</strong>: desplazamiento causado por el <strong>viento</strong>. El barco se mueve algo hacia sotavento; el ángulo entre el rumbo de proa y la trayectoria real por la superficie es el abatimiento.</li>
+  <li><strong>Deriva o corriente</strong>: desplazamiento causado por la <strong>corriente</strong>, que arrastra a la masa de agua entera. Se compone vectorialmente con el rumbo y la velocidad del barco.</li>
+</ul>
+
+<h3>Cartas náuticas</h3>
+<p>La <strong>proyección Mercator</strong> es la habitual en cartas de navegación porque tiene una propiedad muy útil: los meridianos y paralelos se cortan en ángulo recto y una <strong>línea recta trazada sobre la carta corta a todos los meridianos con el mismo ángulo</strong>, es decir, es una <em>loxodrómica</em> y se navega con rumbo constante. A cambio, deforma las superficies al aumentar la latitud.</p>
+<p>La <strong>escala</strong> se expresa como 1:50.000. Cuanto <em>menor</em> es el denominador, mayor es la escala y más detalle hay: una carta 1:20.000 (de puerto) es de escala mayor que una 1:300.000 (de arrumbamiento).</p>
+<p>Las <strong>sondas</strong> están referidas al <strong>cero hidrográfico</strong>, el nivel de la bajamar escorada más viva; por eso la profundidad real suele ser mayor que la sonda cartografiada. Las alturas de los faros y las <strong>veriles</strong> (líneas de igual profundidad) completan la información del fondo.</p>
+
+<h3>Publicaciones náuticas</h3>
+<table>
+  <thead><tr><th>Publicación</th><th>Qué contiene</th></tr></thead>
+  <tbody>
+    <tr><td>Derrotero</td><td>Descripción detallada de las costas, puertos, fondeaderos, corrientes, peligros y recomendaciones de recalada.</td></tr>
+    <tr><td>Libro de faros y señales de niebla</td><td>Características, situación, alcance y altura de todas las luces.</td></tr>
+    <tr><td>Anuario de mareas</td><td>Horas y alturas de pleamares y bajamares por puerto.</td></tr>
+    <tr><td>Avisos a los navegantes</td><td>Correcciones periódicas a cartas y publicaciones. Mantenerlas al día es obligación del patrón.</td></tr>
+    <tr><td>Guía del navegante</td><td>Normativa, procedimientos y radiocomunicaciones.</td></tr>
+  </tbody>
+</table>
+<p>En España las edita el <strong>Instituto Hidrográfico de la Marina</strong>.</p>
+
+<h3>Instrumentos</h3>
+<ul>
+  <li><strong>Compás magnético</strong>: aguja sobre una rosa en un mortero con líquido; la <strong>línea de fe</strong> marca la proa. Debe instalarse lejos de masas férricas y de altavoces.</li>
+  <li><strong>Compás de marcaciones</strong> o taxímetro: para tomar demoras a objetos de la costa.</li>
+  <li><strong>Corredera</strong>: mide velocidad y distancia navegada <em>respecto al agua</em>, no respecto al fondo.</li>
+  <li><strong>Sonda</strong>: mide la profundidad bajo el transductor por eco acústico. Hay que saber si está calibrada desde la quilla o desde la superficie.</li>
+  <li><strong>GPS</strong>: posición por satélite, referida al datum WGS84. Da rumbo y velocidad <em>sobre el fondo</em>, por lo que comparándolo con la corredera se deduce la corriente.</li>
+  <li><strong>Radar</strong>: detecta ecos y permite obtener distancia y demora; muy útil en visibilidad reducida, pero no sustituye a la vigilancia visual.</li>
+  <li><strong>AIS</strong>: intercambia identificación, rumbo y velocidad con otros buques equipados. No todos los barcos lo llevan.</li>
+  <li><strong>Sextante</strong>: mide alturas de astros y ángulos horizontales; en recreo se usa sobre todo para distancias por ángulo vertical.</li>
+</ul>
+</section>

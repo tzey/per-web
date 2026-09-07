@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taller de carta · PER</title>
+<meta name="theme-color" content="#10202B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" data-rail></nav>
+  <main>
+    <p class="eyebrow">Unidad teórica 11</p>
+    <h1>Taller de carta</h1>
+    <p class="entradilla">Las técnicas del ejercicio de carta, resueltas paso a paso, y ejercicios numéricos que se corrigen solos. Cuatro preguntas en el examen y solo puedes fallar dos.</p>
+
+    <div class="nota aviso">
+      <b>Sobre la carta del examen</b>
+      <p>El tribunal entrega la carta oficial de enseñanza —habitualmente la del Estrecho de Gibraltar— y no puede reproducirse aquí por derechos del Instituto Hidrográfico de la Marina. Los ejercicios de esta página son numéricos y autosuficientes: entrenan exactamente el mismo razonamiento, pero puedes resolverlos sin tener la carta delante. Para la parte de trazado, practica sobre tu ejemplar siguiendo los procedimientos de abajo.</p>
+    </div>
+
+    <h2>Las seis técnicas</h2>
+
+    <h3>1 · Situar un punto por sus coordenadas</h3>
+    <div class="pasos">
+      <div class="paso">Busca la latitud en la escala <strong>lateral</strong> y marca con lápiz una referencia en ambos márgenes, izquierdo y derecho.</div>
+      <div class="paso">Une las dos marcas con la regla: esa recta es el paralelo del punto.</div>
+      <div class="paso">Repite con la longitud en las escalas <strong>superior e inferior</strong> y traza el meridiano.</div>
+      <div class="paso">El punto está en el cruce. Márcalo con un circulito y una etiqueta; vas a necesitarlo después.</div>
+    </div>
+    <p>El proceso inverso —obtener las coordenadas de un punto dado— es el mismo al revés: lleva perpendiculares del punto a las escalas y lee.</p>
+
+    <h3>2 · Rumbo entre dos puntos</h3>
+    <div class="pasos">
+      <div class="paso">Une los dos puntos con una recta que se prolongue hasta cortar un meridiano.</div>
+      <div class="paso">Coloca el transportador con su centro en ese cruce y su base sobre el meridiano, con el 0 hacia el norte.</div>
+      <div class="paso">Lee el ángulo en el sentido de la marcha. El resultado es el <strong>rumbo verdadero</strong>.</div>
+      <div class="paso">Comprueba el cuadrante antes de darlo por bueno: si vas al noreste, el rumbo tiene que estar entre 000° y 090°.</div>
+    </div>
+
+    <h3>3 · Medir una distancia</h3>
+    <p>Abre el compás de puntas entre los dos puntos y llévalo, sin cerrarlo, a la <strong>escala de latitudes</strong> del margen lateral, a la altura de la zona donde navegas. Cuenta los minutos: cada minuto es una milla. Si la distancia excede la apertura cómoda del compás, mide en tramos iguales y suma.</p>
+
+    <h3>4 · Corrección total</h3>
+    <p>Es el paso que conecta lo que marca tu compás con lo que dibujas en la carta. La cadena y el orden están desarrollados en la <a href="temario.html#ut10">unidad 10</a>; aquí solo la mecánica:</p>
+    <div class="formula">Ct = dm + Δ          (este +, oeste −)
+
+Del compás a la carta:   Rv = Ra + Ct
+De la carta al compás:   Ra = Rv − Ct</div>
+    <p>Escríbelo en el margen antes de calcular. La inmensa mayoría de los errores de esta unidad son de signo, no de aritmética.</p>
+
+    <h3>5 · Situación por demoras</h3>
+    <div class="pasos">
+      <div class="paso">Corrige las demoras de aguja con la corrección total para convertirlas en verdaderas.</div>
+      <div class="paso">Traza cada demora <strong>desde el objeto de la costa hacia el mar</strong>, no al revés: el faro es el punto conocido.</div>
+      <div class="paso">Tu posición está en el corte. Con tres demoras aparecerá un triángulo pequeño; sitúate en su interior, del lado más alejado de los peligros.</div>
+      <div class="paso">Si dispones de una <strong>enfilación</strong>, úsala: es una línea de posición sin error de compás, y comparar su demora real con la que marque tu aguja te da la corrección total del momento.</div>
+    </div>
+
+    <h3>6 · Estima</h3>
+    <div class="pasos">
+      <div class="paso">Parte de la última situación conocida y traza el rumbo verdadero desde ella.</div>
+      <div class="paso">Calcula la distancia recorrida: D = V × t, con el tiempo en horas.</div>
+      <div class="paso">Lleva esa distancia sobre la línea de rumbo con el compás de puntas, tomada de la escala de latitudes.</div>
+      <div class="paso">Ese es el punto de estima. Lee sus coordenadas y anótalo con el símbolo de estima, no con el de situación observada.</div>
+    </div>
+
+    <div class="nota examen">
+      <b>Reparto del tiempo</b>
+      <p>Tienes 45 minutos para todo el bloque específico del PER, no solo para la carta. Si un apartado se te atasca, pasa al siguiente: las cuatro preguntas de carta suelen encadenarse, pero cada una puntúa por separado y no siempre dependen del resultado anterior.</p>
+    </div>
+
+    <h2>Ejercicios</h2>
+    <p>Escribe el resultado y comprueba. La corrección admite un margen razonable, igual que el trazado real sobre la carta.</p>
+    <div id="ejercicios" class="mono">Cargando ejercicios…</div>
+
+    <footer class="pie">
+      <p>Los procedimientos de trazado siguen la práctica habitual de examen. Contrasta siempre la simbología con la leyenda de tu propia carta.</p>
+    </footer>
+  </main>
+</div>
+
+<script type="module">
+import { pintarRail } from './assets/js/comun.js';
+pintarRail('carta.html');
+
+const cont = document.getElementById('ejercicios');
+
+fetch('data/ejercicios-carta.json').then(r => r.json()).then(ejs => {
+  cont.classList.remove('mono');
+  let tecnicaActual = '';
+  cont.innerHTML = ejs.map(e => {
+    const cabecera = e.tecnica !== tecnicaActual ? (tecnicaActual = e.tecnica, `<h3>${e.tecnica}</h3>`) : '';
+    return `${cabecera}
+    <div class="pregunta" data-id="${e.id}">
+      <p class="enunciado" style="font-weight:400">${e.enunciado}</p>
+      <p style="margin:.4rem 0">
+        <input type="text" inputmode="decimal" size="8" aria-label="Tu respuesta" data-campo>
+        <span class="mono" style="color:var(--tinta-45)">${e.unidad}</span>
+        <button class="btn sec" data-comprobar>Comprobar</button>
+        <button class="btn sec" data-ver>Ver solución</button>
+      </p>
+      <div class="explica" hidden data-veredicto></div>
+      <div class="explica" hidden data-solucion>
+        <ol style="margin:0;padding-left:1.1rem">${e.solucion.map(s => `<li>${s}</li>`).join('')}</ol>
+      </div>
+    </div>`;
+  }).join('');
+
+  const banco = Object.fromEntries(ejs.map(e => [e.id, e]));
+
+  cont.addEventListener('click', ev => {
+    const bloque = ev.target.closest('[data-id]');
+    if (!bloque) return;
+    const e = banco[bloque.dataset.id];
+
+    if (ev.target.matches('[data-ver]')) {
+      const s = bloque.querySelector('[data-solucion]');
+      s.hidden = !s.hidden;
+      ev.target.textContent = s.hidden ? 'Ver solución' : 'Ocultar solución';
+      return;
+    }
+    if (ev.target.matches('[data-comprobar]')) {
+      const bruto = bloque.querySelector('[data-campo]').value.replace(',', '.').trim();
+      const salida = bloque.querySelector('[data-veredicto]');
+      salida.hidden = false;
+      if (bruto === '' || isNaN(+bruto)) {
+        salida.style.borderLeftColor = 'var(--amarillo)';
+        salida.textContent = 'Escribe un número para comprobar.';
+        return;
+      }
+      const bien = Math.abs(+bruto - e.respuesta) <= e.tolerancia;
+      salida.style.borderLeftColor = bien ? 'var(--estribor)' : 'var(--babor)';
+      salida.innerHTML = bien
+        ? `Correcto. El valor exacto es <b>${String(e.respuesta).replace('.', ',')} ${e.unidad}</b>.`
+        : `No es correcto. El valor esperado es <b>${String(e.respuesta).replace('.', ',')} ${e.unidad}</b>, con un margen de ±${String(e.tolerancia).replace('.', ',')}. Abre la solución para ver dónde se tuerce.`;
+      if (!bien) {
+        const s = bloque.querySelector('[data-solucion]');
+        s.hidden = false;
+        bloque.querySelector('[data-ver]').textContent = 'Ocultar solución';
+      }
+    }
+  });
+}).catch(() => {
+  cont.textContent = 'No se han podido cargar los ejercicios. Arranca el sitio desde un servidor local: python3 -m http.server';
+});
+</script>
+</body>
+</html>

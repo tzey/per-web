@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Temario · PER</title>
+<meta name="theme-color" content="#10202B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" data-rail></nav>
+  <main>
+    <p class="eyebrow">Anexo II del RD 875/2014</p>
+    <h1>Temario</h1>
+    <p class="entradilla">Las once unidades teóricas más la ampliación de vela. Las tres unidades con mínimo de aciertos propio van marcadas: son donde se decide el examen.</p>
+
+    <div id="temario" aria-live="polite">
+      <p class="mono" id="cargando">Cargando unidades…</p>
+    </div>
+
+    <footer class="pie">
+      <p>Redactado a partir del contenido exigido en el Anexo II. Las reglas del RIPA se citan por su numeración oficial para que puedas contrastarlas con el reglamento.</p>
+    </footer>
+  </main>
+</div>
+
+<script type="module">
+import { pintarRail, UNIDADES, progreso } from './assets/js/comun.js';
+pintarRail('temario.html');
+
+const ids = [...UNIDADES.map(u => u.id), 'vela'];
+const destino = document.getElementById('temario');
+
+Promise.all(ids.map(id =>
+  fetch(`content/${id}.html`).then(r => r.ok ? r.text() : `<section id="${id}"><h2>Unidad no disponible</h2><p>No se ha podido cargar <code>content/${id}.html</code>.</p></section>`)
+)).then(partes => {
+  destino.innerHTML = partes.join('\n');
+  if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
+  // marca como leída la unidad visible
+  const obs = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) progreso.marcarLeida(e.target.id);
+  }), { threshold: .35 });
+  destino.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+}).catch(() => {
+  document.getElementById('cargando').textContent =
+    'No se han podido cargar las unidades. Si has abierto el archivo con doble clic, arráncalo desde un servidor local: python3 -m http.server';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PER · Teoría y simulador del examen</title>
+<meta name="description" content="Temario completo, taller de carta de navegación y simulador del examen teórico del Patrón de Embarcaciones de Recreo conforme al RD 875/2014.">
+<meta name="theme-color" content="#10202B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" data-rail></nav>
+
+  <main>
+    <p class="eyebrow">Patrón de Embarcaciones de Recreo</p>
+    <h1>Todo el temario, el taller de carta y el examen completo.</h1>
+    <p class="entradilla">Contenido ajustado al Anexo II del Real Decreto 875/2014. El simulador corrige con el baremo real: no basta con sumar aciertos, hay tres materias donde un fallo de más te deja fuera.</p>
+
+    <!-- ============ Rosa de compás: corrección total en vivo ============ -->
+    <section class="taller" style="margin:2.4rem 0 1rem">
+      <figure style="margin:0">
+        <svg viewBox="0 0 340 340" role="img" aria-label="Rosa de compás mostrando el rumbo de aguja y el rumbo verdadero">
+          <defs>
+            <marker id="pta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--derrota)"/>
+            </marker>
+            <marker id="ptn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--tinta-70)"/>
+            </marker>
+          </defs>
+
+          <circle cx="170" cy="170" r="150" fill="var(--sonda-pale)" stroke="var(--tinta)" stroke-width="1.2"/>
+          <circle cx="170" cy="170" r="122" fill="none" stroke="var(--linea)" stroke-width="1"/>
+          <g id="graduacion"></g>
+          <g id="cardinales" font-family="Archivo" font-size="13" font-weight="600" fill="var(--tinta)" text-anchor="middle">
+            <text x="170" y="34">N</text><text x="312" y="175">E</text>
+            <text x="170" y="318">S</text><text x="28" y="175">W</text>
+          </g>
+
+          <!-- aguja verdadera (norte geográfico) -->
+          <line id="agujaV" x1="170" y1="170" x2="170" y2="50" stroke="var(--tinta-70)" stroke-width="2" marker-end="url(#ptn)"/>
+          <!-- rumbo trazado (derrota) -->
+          <line id="agujaR" x1="170" y1="170" x2="170" y2="40" stroke="var(--derrota)" stroke-width="2.5" marker-end="url(#pta)"/>
+          <circle cx="170" cy="170" r="5" fill="var(--tinta)"/>
+        </svg>
+        <figcaption>Rosa graduada. La línea magenta es el rumbo verdadero que trazarías en la carta; la gris, la dirección que marca la aguja.</figcaption>
+      </figure>
+
+      <div class="panel" style="margin:0">
+        <h3>Corrección total</h3>
+        <p style="font-size:.92rem">Mueve los valores y observa cómo se separan las dos agujas. Es el cálculo que aparece, de una forma u otra, en casi todos los ejercicios de carta.</p>
+
+        <p style="margin:.8rem 0 .2rem"><label for="ra">Rumbo de aguja <span class="mono" id="raV">045</span>°</label></p>
+        <input type="range" id="ra" min="0" max="359" value="45" style="width:100%">
+
+        <p style="margin:.8rem 0 .2rem"><label for="dm">Declinación magnética <span class="mono" id="dmV">+3</span>°</label></p>
+        <input type="range" id="dm" min="-20" max="20" value="3" style="width:100%">
+
+        <p style="margin:.8rem 0 .2rem"><label for="dv">Desvío de aguja <span class="mono" id="dvV">−2</span>°</label></p>
+        <input type="range" id="dv" min="-20" max="20" value="-2" style="width:100%">
+
+        <div class="formula" id="calculo"></div>
+      </div>
+    </section>
+
+    <h2>Por dónde empezar</h2>
+    <div class="tarjetas">
+      <a class="tarjeta" href="temario.html">
+        <h3>Temario</h3>
+        <p>Las once unidades desarrolladas, con esquemas de luces, balizamiento y nudos.</p>
+      </a>
+      <a class="tarjeta" href="carta.html">
+        <h3>Taller de carta</h3>
+        <p>Las seis técnicas del ejercicio de carta, resueltas paso a paso.</p>
+      </a>
+      <a class="tarjeta" href="test.html">
+        <h3>Simulador</h3>
+        <p>Modelos A y B en modo examen cronometrado o en modo repaso.</p>
+      </a>
+    </div>
+
+    <h2>Cómo se aprueba</h2>
+    <p>El examen son 45 preguntas con cuatro opciones y 90 minutos: 45 para el bloque común con el PNB y 45 para el específico del PER. Los fallos no restan, así que dejar una en blanco solo garantiza el error.</p>
+
+    <table>
+      <thead><tr><th>Requisito</th><th class="num">Valor</th></tr></thead>
+      <tbody>
+        <tr><td>Aciertos mínimos sobre 45</td><td class="num">32</td></tr>
+        <tr><td>Errores máximos totales</td><td class="num">13</td></tr>
+        <tr><td>Balizamiento: aciertos mínimos de 5</td><td class="num">3</td></tr>
+        <tr><td>RIPA: aciertos mínimos de 10</td><td class="num">5</td></tr>
+        <tr><td>Carta de navegación: aciertos mínimos de 4</td><td class="num">2</td></tr>
+      </tbody>
+    </table>
+
+    <div class="nota examen">
+      <b>El detalle que suspende a gente que se sabe el temario</b>
+      <p>Los mínimos por materia se aplican aunque el total vaya sobrado. Con 42 aciertos de 45 estás suspenso si los tres fallos caen en Balizamiento, porque ahí solo puedes fallar dos. Balizamiento, RIPA y Carta suman 19 de las 45 preguntas y concentran todo el riesgo.</p>
+    </div>
+
+    <h2>Tu progreso</h2>
+    <div id="panelProgreso"></div>
+
+    <footer class="pie">
+      <p>Material de estudio. La norma aplicable es el Real Decreto 875/2014 y sus modificaciones posteriores; para el ejercicio de carta, el examen entrega la carta oficial de enseñanza. Verifica siempre convocatoria y criterios ante la administración que te examina.</p>
+    </footer>
+  </main>
+</div>
+
+<script type="module">
+import { pintarRail, progreso, BAREMO } from './assets/js/comun.js';
+pintarRail('index.html');
+
+/* ---- rosa de compás ---- */
+const g = document.getElementById('graduacion');
+let marcas = '';
+for (let a = 0; a < 360; a += 5) {
+  const largo = a % 30 === 0 ? 14 : (a % 10 === 0 ? 9 : 5);
+  const rad = (a - 90) * Math.PI / 180;
+  const r1 = 150, r2 = 150 - largo;
+  marcas += `<line x1="${170 + r1 * Math.cos(rad)}" y1="${170 + r1 * Math.sin(rad)}"
+                   x2="${170 + r2 * Math.cos(rad)}" y2="${170 + r2 * Math.sin(rad)}"
+                   stroke="var(--tinta-45)" stroke-width="${a % 30 === 0 ? 1.4 : .7}"/>`;
+}
+g.innerHTML = marcas;
+
+const sig = n => (n >= 0 ? '+' : '−') + Math.abs(n);
+const punta = (el, ang, r) => {
+  const rad = (ang - 90) * Math.PI / 180;
+  el.setAttribute('x2', 170 + r * Math.cos(rad));
+  el.setAttribute('y2', 170 + r * Math.sin(rad));
+};
+
+function refrescar() {
+  const Ra = +ra.value, dm = +document.getElementById('dm').value, dv = +document.getElementById('dv').value;
+  const Ct = dm + dv;
+  const Rv = ((Ra + Ct) % 360 + 360) % 360;
+  raV.textContent = String(Ra).padStart(3, '0');
+  dmV.textContent = sig(dm); dvV.textContent = sig(dv);
+  punta(agujaR, Rv, 130);
+  punta(agujaV, Ra, 118);
+  document.getElementById('calculo').textContent =
+`dm  ${sig(dm).padStart(3)}°
+Δ   ${sig(dv).padStart(3)}°
+──────────
+Ct  ${sig(Ct).padStart(3)}°
+
+Rv = Ra + Ct = ${String(Ra).padStart(3,'0')}° ${sig(Ct)}° = ${String(Rv).padStart(3,'0')}°`;
+}
+['ra','dm','dv'].forEach(id => document.getElementById(id).addEventListener('input', refrescar));
+refrescar();
+
+/* ---- panel de progreso ---- */
+const d = progreso.leer();
+const cont = document.getElementById('panelProgreso');
+if (!d.intentos.length) {
+  cont.innerHTML = `<div class="panel">
+    <h3>Todavía no has hecho ningún simulacro</h3>
+    <p style="font-size:.93rem">Los resultados se guardan en este navegador, sin cuenta ni servidor. Empieza por el modelo A en modo repaso para ver las explicaciones según respondes.</p>
+    <p style="margin:0"><a class="btn acc" href="test.html">Abrir el simulador</a></p>
+  </div>`;
+} else {
+  const aptos = d.intentos.filter(i => i.apto).length;
+  const ult = d.intentos[0];
+  cont.innerHTML = `<div class="panel">
+    <h3>${d.intentos.length} simulacro${d.intentos.length > 1 ? 's' : ''} · ${aptos} apto${aptos !== 1 ? 's' : ''}</h3>
+    <div class="racha">${d.intentos.slice(0, 20).reverse().map(i =>
+      `<i class="${i.apto ? 'apto' : 'no'}" title="${new Date(i.fecha).toLocaleDateString('es-ES')} · ${i.aciertos}/${i.total}">${i.aciertos}</i>`).join('')}</div>
+    <p style="font-size:.93rem;margin:.6rem 0 0">Último: modelo ${ult.modelo} · ${ult.aciertos} aciertos de ${ult.total} · ${ult.apto ? 'apto' : 'no apto'}.</p>
+    <p style="margin:.8rem 0 0"><a class="btn acc" href="test.html">Nuevo simulacro</a>
+       <button class="btn sec" id="borrar">Borrar progreso</button></p>
+  </div>`;
+  document.getElementById('borrar').onclick = () => {
+    if (confirm('Se borrará el historial guardado en este navegador. ¿Continuar?')) { progreso.borrar(); location.reload(); }
+  };
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
