@@ -6,7 +6,8 @@
 import { pintarRail, UNIDADES } from '../comun.js';
 import { pintarCarta, crearZoomPan, fichaObjeto, buscarObjeto, dibujarTrazo } from './carta.js';
 import { generar, TIPOS } from './ejercicios.js';
-import { formatearGrados, formatearAngulo } from './geo.js';
+import { formatearGrados, formatearAngulo, formatearMillas } from './geo.js';
+import { crearCompasPuntas, crearTransportador, crearLapiz } from './instrumentos.js';
 
 pintarRail('mesa.html');
 
@@ -18,7 +19,8 @@ const estado = {
   semilla: +(params.get('semilla') ?? Math.floor(Math.random() * 9000 + 1000)),
   modo: params.get('modo') ?? 'aprendizaje',
   anyo: +(params.get('anyo') ?? new Date().getFullYear()),
-  carta: null, tablilla: null, vista: null, zoom: null, ej: null, pistas: 0, lecturas: false
+  carta: null, tablilla: null, vista: null, zoom: null, ej: null, pistas: 0, lecturas: false,
+  compas: null, transportador: null, lapiz: null
 };
 
 const AVISOS = {
@@ -188,26 +190,86 @@ function mostrarPistas(n) {
 
 /* ---------- Herramientas ---------- */
 
+const AVISOS_COMPAS = {
+  'en-longitudes': 'Estás midiendo en la escala de longitudes. Un minuto de longitud no es una milla: lleva el compás a la escala lateral.',
+  'latitud-alejada': 'Has llevado el compás a una latitud lejana a la zona medida. En Mercator la escala cambia con la latitud: lee a la altura donde navegas.',
+  'no-en-escala': 'Coloca las dos puntas sobre la escala lateral de latitudes para leer la distancia.'
+};
+
 function pintarHerramientas() {
   const h = $('#herramientas');
   h.innerHTML = `
-    <button class="btn sec" id="btnLecturas" aria-pressed="false" title="Muestra latitud y longitud bajo el cursor">Lecturas</button>
-    <button class="btn sec" id="btnCartaCompleta">Carta completa</button>
+    <button class="btn sec" data-instr="compas" aria-pressed="false" title="Compás de puntas: arrastra las puntas; llévalo a la escala lateral para leer millas">Compás</button>
+    <button class="btn sec" data-instr="transportador" aria-pressed="false" title="Transportador: arrastra el cuerpo para moverlo y el asa para girar la regla">Transportador</button>
     <span class="sep"></span>
+    <button class="btn sec" data-lapiz="recta" aria-pressed="false" title="Recta por arrastre">Recta</button>
+    <button class="btn sec" data-lapiz="punto" aria-pressed="false" title="Marca con etiqueta">Punto</button>
+    <button class="btn sec" data-lapiz="estima" aria-pressed="false" title="Símbolo de situación de estima">Estima</button>
+    <button class="btn sec" data-lapiz="observada" aria-pressed="false" title="Símbolo de situación observada">Observada</button>
+    <button class="btn sec" data-lapiz="borrar" aria-pressed="false" title="Goma: pulsa sobre un trazo">Goma</button>
+    <button class="btn sec" id="btnDeshacer" title="Deshacer (Ctrl+Z)">↶</button>
+    <button class="btn sec" id="btnRehacer" title="Rehacer (Ctrl+Mayús+Z)">↷</button>
+    <span class="sep"></span>
+    <button class="btn sec" id="btnLecturas" aria-pressed="false" title="Lecturas numéricas de instrumentos y trazos">Lecturas</button>
+    <button class="btn sec" id="btnCartaCompleta">Carta completa</button>
     <span id="lecturaCursor" class="lectura" aria-live="off"></span>`;
+  const aviso = document.createElement('div');
+  aviso.id = 'avisoInstrumento'; aviso.className = 'nota aviso'; aviso.hidden = true; aviso.style.margin = '.6rem 0 0';
+  h.after(aviso);
+
+  const { proyeccion: proy, capas } = estado.vista;
+  const svg = $('#carta');
+  const centro = { x: (proy.marco.x0 + proy.marco.x1) / 2, y: (proy.marco.y0 + proy.marco.y1) / 2 };
+
+  estado.compas = crearCompasPuntas(capas.instrumentos, proy, lectura => {
+    if (!estado.compas?.visible()) return;
+    if (lectura.dentro) { $('#lecturaCursor').textContent = estado.lecturas ? `abertura ${formatearMillas(lectura.millas, 2)}` : ''; mostrarAviso(null); }
+    else if (lectura.motivo === 'ok') { $('#lecturaCursor').textContent = estado.lecturas ? `lectura ${formatearMillas(lectura.millas, 2)}` : 'lectura tomada'; mostrarAviso(null); }
+    else mostrarAviso(estado.modo === 'aprendizaje' ? AVISOS_COMPAS[lectura.motivo] : null);
+  });
+  estado.compas.fijar({ x: centro.x - 60, y: centro.y }, { x: centro.x + 60, y: centro.y });
+  estado.transportador = crearTransportador(capas.instrumentos, proy, ({ angulo }) => {
+    if (estado.transportador?.visible() && estado.lecturas) $('#lecturaCursor').textContent = `regla ${formatearAngulo(angulo)}`;
+  });
+  estado.transportador.centrar({ x: centro.x, y: centro.y + 80 });
+  estado.lapiz = crearLapiz(svg, capas.trazos, proy, dibujarTrazo, () => {});
+
+  h.querySelectorAll('[data-instr]').forEach(b => b.onclick = () => {
+    const inst = estado[b.dataset.instr];
+    inst.mostrar(!inst.visible());
+    b.setAttribute('aria-pressed', String(inst.visible()));
+  });
+  h.querySelectorAll('[data-lapiz]').forEach(b => b.onclick = () => {
+    const nuevo = estado.lapiz.modo() === b.dataset.lapiz ? null : b.dataset.lapiz;
+    estado.lapiz.modo(nuevo);
+    h.querySelectorAll('[data-lapiz]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.lapiz === nuevo)));
+    svg.style.cursor = nuevo ? 'crosshair' : '';
+  });
+  $('#btnDeshacer').onclick = () => estado.lapiz.deshacer();
+  $('#btnRehacer').onclick = () => estado.lapiz.rehacer();
   $('#btnCartaCompleta').onclick = () => estado.zoom.reiniciar();
   $('#btnLecturas').onclick = ev => {
     estado.lecturas = !estado.lecturas;
     ev.currentTarget.setAttribute('aria-pressed', String(estado.lecturas));
+    estado.compas.mostrarLectura(estado.lecturas);
+    estado.transportador.mostrarLectura(estado.lecturas);
+    estado.lapiz.mostrarLectura(estado.lecturas);
     if (!estado.lecturas) $('#lecturaCursor').textContent = '';
   };
-  $('#carta').addEventListener('pointermove', ev => {
-    if (!estado.lecturas) return;
+  svg.addEventListener('pointermove', ev => {
+    if (!estado.lecturas || ev.target.closest('.capa-instrumentos')) return;
     const p = estado.zoom.aViewBox(ev);
     const k = estado.zoom.escala(), t = estado.zoom.traslacion();
-    const [lat, lon] = estado.vista.proyeccion.aGeo((p.x - t.x) / k, (p.y - t.y) / k);
+    const [lat, lon] = proy.aGeo((p.x - t.x) / k, (p.y - t.y) / k);
     $('#lecturaCursor').textContent = fPos([lat, lon]);
   });
+}
+
+function mostrarAviso(texto) {
+  const a = $('#avisoInstrumento');
+  if (!a) return;
+  a.hidden = !texto;
+  if (texto) a.innerHTML = `<b>Ojo con el compás</b><p>${texto}</p>`;
 }
 
 /* ---------- Fichas ---------- */
@@ -242,7 +304,7 @@ async function iniciar() {
   }
   const svg = $('#carta');
   estado.vista = pintarCarta(svg, estado.carta, { anyo: estado.anyo });
-  estado.zoom = crearZoomPan(svg, estado.vista.mundo, { esFondo: t => !t.closest('.capa-instrumentos, .capa-trazos, .objeto') });
+  estado.zoom = crearZoomPan(svg, estado.vista.mundo, { esFondo: t => !estado.lapiz?.modo() && !t.closest('.capa-instrumentos, .capa-trazos, .objeto') });
   activarFichas();
   pintarHerramientas();
   if (!TIPOS.some(t => t.id === estado.tipo && t.cartas.includes(estado.carta.meta.tipo))) estado.tipo = TIPOS.find(t => t.cartas.includes(estado.carta.meta.tipo)).id;
