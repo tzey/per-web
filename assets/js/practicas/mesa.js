@@ -8,6 +8,7 @@ import { pintarCarta, crearZoomPan, fichaObjeto, buscarObjeto, dibujarTrazo } fr
 import { generar, TIPOS } from './ejercicios.js';
 import { formatearGrados, formatearAngulo, formatearMillas } from './geo.js';
 import { crearCompasPuntas, crearTransportador, crearLapiz } from './instrumentos.js';
+import { crearSesion, sesionPrevia, registrarResultado } from './sesion.js';
 
 pintarRail('mesa.html');
 
@@ -20,7 +21,8 @@ const estado = {
   modo: params.get('modo') ?? 'aprendizaje',
   anyo: +(params.get('anyo') ?? new Date().getFullYear()),
   carta: null, tablilla: null, vista: null, zoom: null, ej: null, pistas: 0, lecturas: false,
-  compas: null, transportador: null, lapiz: null
+  compas: null, transportador: null, lapiz: null, sesion: null,
+  opciones: { viento: null, corriente: null }, errores: { desvioExtra: 0 }
 };
 
 const AVISOS = {
@@ -82,9 +84,13 @@ function destacar(ids) {
 /* ---------- Ejercicio ---------- */
 
 function cargarEjercicio() {
-  estado.ej = generar(estado.tipo, { carta: estado.carta, tablilla: estado.tablilla, anyo: estado.anyo, semilla: estado.semilla });
+  estado.ej = generar(estado.tipo, { carta: estado.carta, tablilla: estado.tablilla, anyo: estado.anyo, semilla: estado.semilla, opciones: estado.opciones });
   estado.pistas = 0;
   estado.vista.capas.solucion.replaceChildren();
+  estado.sesion = crearSesion({ modo: estado.modo, cartaId: estado.cartaId, versionCarta: estado.carta.version, errores: estado.errores,
+    ejercicios: [{ id: estado.ej.id, tipo: estado.ej.tipo, semilla: estado.ej.semilla }] });
+  const previa = sesionPrevia(estado.ej.id);
+  estado.lapiz?.cargar(previa?.trazos ?? []);
   const u = new URL(location); u.searchParams.set('tipo', estado.tipo); u.searchParams.set('semilla', estado.semilla); u.searchParams.set('carta', estado.cartaId);
   history.replaceState(null, '', u);
   destacar(objetosDelEjercicio(estado.ej));
@@ -115,6 +121,18 @@ function pintarPanel() {
       <div class="pistas" id="pistas" hidden><ol></ol></div>
     </div>
     <details class="panel" style="padding:.8rem 1.1rem">
+      <summary>Condiciones de prácticas (no salen en el examen)</summary>
+      <div class="campos" style="margin:.6rem 0 0">
+        <label>Corriente: rumbo <input type="text" inputmode="numeric" id="corrRumbo" value="${estado.opciones.corriente?.rumbo ?? ''}" placeholder="090"></label>
+        <label>Corriente: nudos <input type="text" inputmode="decimal" id="corrInt" value="${estado.opciones.corriente?.intensidad ?? ''}" placeholder="1,5"></label>
+        <label>Abatimiento (°) <input type="text" inputmode="decimal" id="vientoAbat" value="${estado.opciones.viento?.abatimiento ?? ''}" placeholder="5"></label>
+        <label>Abate hacia <select id="vientoBanda"><option value="estribor" ${estado.opciones.viento?.banda === 'estribor' ? 'selected' : ''}>estribor</option><option value="babor" ${estado.opciones.viento?.banda === 'babor' ? 'selected' : ''}>babor</option></select></label>
+        <label>Error extra de aguja (°) <input type="text" inputmode="decimal" id="desvioExtra" value="${estado.errores.desvioExtra || ''}" placeholder="0"></label>
+      </div>
+      <p style="font-size:.85rem;color:var(--tinta-70);margin:.5rem 0 0">La corriente y el abatimiento solo afectan a la estima. El error de aguja se suma a lo que marca la regla del transportador con las lecturas activadas.</p>
+      <p style="margin:.5rem 0 0"><button class="btn sec" id="aplicarCondiciones">Aplicar y regenerar</button></p>
+    </details>
+    <details class="panel" style="padding:.8rem 1.1rem">
       <summary>Cambiar de ejercicio</summary>
       <div class="barra" style="margin:.6rem 0 0">
         <select id="selTipo" aria-label="Tipo de ejercicio">
@@ -131,6 +149,16 @@ function pintarPanel() {
   $('#solucion').onclick = () => mostrarPistas(ej.solucion.length);
   $('#otro').onclick = () => { estado.semilla = Math.floor(Math.random() * 9000 + 1000); cargarEjercicio(); };
   $('#irEjercicio').onclick = () => { estado.tipo = $('#selTipo').value; estado.semilla = +$('#inSemilla').value || 1; cargarEjercicio(); };
+  $('#aplicarCondiciones').onclick = () => {
+    const num = id => { const v = Number($(id).value.replace(',', '.')); return Number.isFinite(v) && $(id).value.trim() !== '' ? v : null; };
+    const cr = num('#corrRumbo'), ci = num('#corrInt'), ab = num('#vientoAbat');
+    estado.opciones = {
+      corriente: cr !== null && ci ? { rumbo: cr, intensidad: ci } : null,
+      viento: ab ? { abatimiento: ab, banda: $('#vientoBanda').value } : null
+    };
+    estado.errores = { desvioExtra: num('#desvioExtra') ?? 0 };
+    cargarEjercicio();
+  };
   $('#panel').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches('[data-campo]')) comprobar(); });
 }
 
@@ -157,6 +185,9 @@ function comprobar() {
   }).join('');
   salida.innerHTML = `${r.correcto ? '<b>Correcto.</b>' : '<b>No es correcto.</b>'}<ul style="margin:.4rem 0 0;padding-left:1.1rem">${filas}</ul>${r.avisos.map(a => `<p style="margin:.5rem 0 0"><b>Aviso:</b> ${AVISOS[a] ?? a}</p>`).join('')}`;
   if (!r.correcto && estado.pistas === 0) mostrarPistas(1);
+  estado.sesion.registrarRespuesta(ej.id, leerRespuesta(), r);
+  estado.sesion.guardar();
+  registrarResultado({ modo: estado.modo, tipo: ej.tipo, semilla: ej.semilla, aciertos: r.correcto ? 1 : 0, total: 1, apto: r.correcto });
   document.dispatchEvent(new CustomEvent('mesa:comprobado', { detail: { ejercicio: ej, resultado: r } }));
 }
 
@@ -229,10 +260,20 @@ function pintarHerramientas() {
   });
   estado.compas.fijar({ x: centro.x - 60, y: centro.y }, { x: centro.x + 60, y: centro.y });
   estado.transportador = crearTransportador(capas.instrumentos, proy, ({ angulo }) => {
-    if (estado.transportador?.visible() && estado.lecturas) $('#lecturaCursor').textContent = `regla ${formatearAngulo(angulo)}`;
+    if (estado.transportador?.visible() && estado.lecturas) {
+      const mostrado = estado.sesion ? estado.sesion.percibido('rumbo', angulo) : angulo;
+      $('#lecturaCursor').textContent = `regla ${formatearAngulo(mostrado)}${mostrado !== angulo ? ' (aguja con error)' : ''}`;
+    }
   });
   estado.transportador.centrar({ x: centro.x, y: centro.y + 80 });
-  estado.lapiz = crearLapiz(svg, capas.trazos, proy, dibujarTrazo, () => {});
+  let nTrazos = 0;
+  estado.lapiz = crearLapiz(svg, capas.trazos, proy, dibujarTrazo, ({ trazos }) => {
+    if (!estado.sesion) return;
+    if (trazos.length > nTrazos) estado.sesion.registrarTrazo(trazos[trazos.length - 1]);
+    nTrazos = trazos.length;
+    estado.sesion.fijarTrazos(trazos);
+    estado.sesion.guardar();
+  });
 
   h.querySelectorAll('[data-instr]').forEach(b => b.onclick = () => {
     const inst = estado[b.dataset.instr];
