@@ -9,7 +9,8 @@ import {
   normalizar, diferenciaAngular, reciproco, parsearGrados, formatearGrados, formatearAngulo,
   parsearHora, formatearHora, rumboDistancia, puntoDesde, correccionTotal, rumboAguja,
   declinacionActualizada, desvioPorTablilla, estima as estimar, tiempoParaDistancia,
-  cortarRectas, calidadCorte, situacionDemoraDistancia
+  cortarRectas, calidadCorte, situacionDemoraDistancia,
+  alturaMarea, horaParaAltura, eventosAlrededor, sondaReal, resguardo as calcResguardo
 } from './geo.js';
 import { enTierra, buscarObjeto } from './carta.js';
 
@@ -55,7 +56,12 @@ export const TIPOS = [
   { id: 'situacion-dos-demoras', bloque: 'carta', fase: 1, titulo: 'Situación por dos demoras simultáneas', cartas: ['costera'] },
   { id: 'situacion-enfilacion-demora', bloque: 'carta', fase: 1, titulo: 'Situación por enfilación y demora', cartas: ['costera'] },
   { id: 'situacion-demora-distancia', bloque: 'carta', fase: 1, titulo: 'Situación por demora y distancia', cartas: ['costera'] },
-  { id: 'derrota-resguardo-peligro', bloque: 'carta', fase: 1, titulo: 'Derrota con resguardo a un peligro', cartas: ['costera'] }
+  { id: 'derrota-resguardo-peligro', bloque: 'carta', fase: 1, titulo: 'Derrota con resguardo a un peligro', cartas: ['costera'] },
+  { id: 'marea-altura-hora', bloque: 'mareas', fase: 2, titulo: 'Altura de la marea a una hora', cartas: ['costera'] },
+  { id: 'marea-resguardo-paso', bloque: 'mareas', fase: 2, titulo: 'Profundidad real y resguardo', cartas: ['costera'] },
+  { id: 'marea-hora-minima', bloque: 'mareas', fase: 2, titulo: 'Hora mínima para pasar un bajo', cartas: ['costera'] },
+  { id: 'gnss-vs-estima', bloque: 'gnss', fase: 2, titulo: 'GNSS frente a estima', cartas: ['costera'] },
+  { id: 'gnss-waypoint-mob', bloque: 'gnss', fase: 2, titulo: 'Waypoint y hombre al agua', cartas: ['costera'] }
 ];
 
 /* ---------- Formato ---------- */
@@ -77,10 +83,10 @@ function gradosMin(dec) {
 /* ---------- Contexto y utilidades geográficas ---------- */
 
 function contexto(ctx) {
-  const { carta, tablilla, anyo = new Date().getFullYear(), semilla = 1 } = ctx;
+  const { carta, tablilla, mareas = null, anyo = new Date().getFullYear(), semilla = 1 } = ctx;
   if (!carta) throw new Error('generar: falta la carta');
   return {
-    carta, tablilla, anyo, semilla,
+    carta, tablilla, mareas, anyo, semilla,
     fijar: ctx.fijar ?? {},
     opciones: { viento: null, corriente: null, ...(ctx.opciones ?? {}) },
     tol: TOLERANCIAS[carta.meta.escala] ?? TOLERANCIAS[100000],
@@ -153,9 +159,212 @@ function pasoCt(c, dm, desvio, ct) {
   ];
 }
 
+/* ---------- Mareas ---------- */
+
+/** Eventos ['BM','03:12',0.6] de un puerto y fecha, aplicando diferencias si es secundario. */
+export function eventosPuerto(mareas, puertoId, fecha) {
+  const p = mareas?.puertos?.[puertoId];
+  if (!p) return null;
+  if (p.patron) { const e = mareas.anuario?.[puertoId]?.[fecha]; return e ? e.map(x => [...x]) : null; }
+  const base = mareas.anuario?.[p.referencia]?.[fecha];
+  if (!base) return null;
+  const d = p.diferencias ?? {};
+  return base.map(([tipo, hora, alt]) => {
+    const t = parsearHora(hora) + (tipo === 'PM' ? d.horaPM ?? 0 : d.horaBM ?? 0);
+    return [tipo, formatearHora(t), Math.round((alt + (tipo === 'PM' ? d.alturaPM ?? 0 : d.alturaBM ?? 0)) * 100) / 100, t];
+  }).filter(e => e[3] < 1440).map(e => e.slice(0, 3));
+}
+
+const fM_ = v => `${Number(v).toFixed(1).replace('.', ',')} m`;
+
+export function explicarResguardo({ sondaCarta, alturaMarea: altura, calado, margen = 0 }) {
+  const profundidad = sondaReal(sondaCarta, altura);
+  const resguardo = calcResguardo(profundidad, calado);
+  const seguro = resguardo >= margen - 1e-9;
+  const texto = `Profundidad = sonda de carta ${fM_(sondaCarta)} + altura de marea ${fM_(altura)} = ${fM_(profundidad)}. ` +
+    `Resguardo = ${fM_(profundidad)} − calado ${fM_(calado)} = ${fM_(resguardo)}` +
+    (margen ? `, frente a un margen exigido de ${fM_(margen)}: ${seguro ? 'suficiente' : 'insuficiente'}.` : '.');
+  return { profundidad, resguardo, seguro, texto };
+}
+
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const fFecha = f => { const [a, m, d] = f.split('-').map(Number); return `${d} de ${MESES[m - 1]} de ${a}`; };
+
+function diaDeMareas(c, prng) {
+  if (!c.mareas) return null;
+  const puertoId = elegir(prng, Object.keys(c.mareas.puertos));
+  const patron = c.mareas.puertos[puertoId].patron ? puertoId : c.mareas.puertos[puertoId].referencia;
+  const fecha = elegir(prng, Object.keys(c.mareas.anuario[patron] ?? {}));
+  const eventos = eventosPuerto(c.mareas, puertoId, fecha);
+  if (!eventos || eventos.length < 2) return null;
+  return { puertoId, nombre: c.mareas.puertos[puertoId].nombre, fecha, eventos };
+}
+
+const pasosMarea = (d, ant, des, hora, altura) => {
+  const t0 = parsearHora(ant[1]), t1 = parsearHora(des[1]), dur = t1 - t0;
+  const f = (hora - t0) / dur;
+  return [
+    { texto: `Anuario de ${d.nombre}, ${fFecha(d.fecha)}: ${d.eventos.map(e => `${e[0]} ${e[1]} ${fM_(e[2])}`).join(' · ')}. La hora pedida cae entre ${ant[0]} ${ant[1]} (${fM_(ant[2])}) y ${des[0]} ${des[1]} (${fM_(des[2])}).` },
+    { texto: `Duración del tramo: ${dur} min. Carrera: ${fM_(Math.abs(des[2] - ant[2]))}. Han pasado ${hora - t0} min, ${fNum(f * 6, 1)} sextos.` },
+    { texto: `Regla de los doceavos (aproximación docente: 1, 2, 3, 3, 2, 1 doceavos por sexto): la altura a las ${formatearHora(hora)} es ${fM_(altura)}.`, valor: altura }
+  ];
+};
+
+/** Punto somero para ejercicios de marea: sondas de la carta y peligros con sonda mínima. */
+function sondaSomera(c, prng, min = 0.8, max = 8) {
+  const candidatas = [
+    ...c.carta.sondas.map(s => ({ pos: s.pos, prof: s.prof, nombre: null })),
+    ...c.carta.peligros.filter(p => typeof p.prof === 'number').map(p => ({ pos: p.pos, prof: p.prof, nombre: p.nombre }))
+  ].filter(s => s.prof >= min && s.prof <= max);
+  return candidatas.length ? elegir(prng, candidatas) : null;
+}
+const nombreSonda = s => s.nombre ? `${s.nombre} (sonda ${fM_(s.prof)})` : `un punto de sonda ${fM_(s.prof)}`;
+
 /* ---------- Generadores ---------- */
 
 const GENERADORES = {
+
+  'marea-altura-hora'(c, prng) {
+    const d = diaDeMareas(c, prng);
+    if (!d) return { real: { degenerado: 'sin-mareas' } };
+    const i = entero(prng, 0, d.eventos.length - 2);
+    const ant = d.eventos[i], des = d.eventos[i + 1];
+    const t0 = parsearHora(ant[1]), t1 = parsearHora(des[1]);
+    if (t1 - t0 < 60) return { real: { degenerado: 'tramo-corto' } };
+    const hora = redondear(t0 + 15 + prng() * (t1 - t0 - 30), 5);
+    const altura = alturaMarea(hora, ant, des);
+    return {
+      enunciado: `Anuario de ${d.nombre}, ${fFecha(d.fecha)}: ${d.eventos.map(e => `${e[0]} ${e[1]} ${fM_(e[2])}`).join(', ')}. ¿Qué altura de marea hay a las ${formatearHora(hora)}? Usa la regla de los doceavos.`,
+      visibles: { puerto: d.puertoId, fecha: d.fecha, eventos: d.eventos, hora: formatearHora(hora) },
+      real: { puerto: d.puertoId, fecha: d.fecha, hora, tramo: [ant, des], altura, respuesta: { altura } },
+      solucion: pasosMarea(d, ant, des, hora, altura),
+      campos: [{ id: 'altura', etiqueta: 'Altura de marea (m)', tipo: 'metros' }]
+    };
+  },
+
+  'marea-resguardo-paso'(c, prng) {
+    const d = diaDeMareas(c, prng);
+    if (!d) return { real: { degenerado: 'sin-mareas' } };
+    const sonda = sondaSomera(c, prng, 0.8, 8);
+    if (!sonda) return { real: { degenerado: 'sin-sondas' } };
+    const i = entero(prng, 0, d.eventos.length - 2);
+    const ant = d.eventos[i], des = d.eventos[i + 1];
+    const t0 = parsearHora(ant[1]), t1 = parsearHora(des[1]);
+    if (t1 - t0 < 60) return { real: { degenerado: 'tramo-corto' } };
+    const hora = redondear(t0 + 15 + prng() * (t1 - t0 - 30), 5);
+    const altura = Math.round(alturaMarea(hora, ant, des) * 100) / 100;
+    const bm = Math.min(...d.eventos.map(e => e[2])), pm = Math.max(...d.eventos.map(e => e[2]));
+    const combinaciones = [];
+    for (const calado of [1.2, 1.5, 1.8, 2.0, 2.4]) for (const margen of [0.5, 1.0]) {
+      // inseguro en bajamar y seguro en pleamar: la marea decide
+      if (sonda.prof + bm - calado < margen && sonda.prof + pm - calado >= margen) combinaciones.push([calado, margen]);
+    }
+    if (!combinaciones.length) return { real: { degenerado: 'sin-combinacion' } };
+    const [calado, margen] = elegir(prng, combinaciones);
+    const alerta = explicarResguardo({ sondaCarta: sonda.prof, alturaMarea: altura, calado, margen });
+    return {
+      enunciado: `Quieres pasar a las ${formatearHora(hora)} sobre ${nombreSonda(sonda)} en ${fPos(sonda.pos)}, con un calado de ${fM_(calado)} y un margen de seguridad de ${fM_(margen)}. Anuario de ${d.nombre}, ${fFecha(d.fecha)}: ${d.eventos.map(e => `${e[0]} ${e[1]} ${fM_(e[2])}`).join(', ')}. Halla la profundidad real y el resguardo bajo la quilla.`,
+      visibles: { puerto: d.puertoId, fecha: d.fecha, eventos: d.eventos, hora: formatearHora(hora), sondaCarta: sonda.prof, sondaPos: sonda.pos, calado, margen },
+      real: { puerto: d.puertoId, hora, tramo: [ant, des], altura, punto: sonda.pos, alerta, respuesta: { profundidad: alerta.profundidad, resguardo: alerta.resguardo } },
+      solucion: [
+        { texto: `Localiza la sonda ${fM_(sonda.prof)} en la carta.`, trazo: { tipo: 'punto', pos: sonda.pos, simbolo: 'marca', etiqueta: `sonda ${String(sonda.prof).replace('.', ',')}` } },
+        ...pasosMarea(d, ant, des, hora, altura),
+        { texto: alerta.texto, valor: alerta.resguardo }
+      ],
+      campos: [{ id: 'profundidad', etiqueta: 'Profundidad real (m)', tipo: 'metros' }, { id: 'resguardo', etiqueta: 'Resguardo (m)', tipo: 'metros' }]
+    };
+  },
+
+  'marea-hora-minima'(c, prng) {
+    const d = diaDeMareas(c, prng);
+    if (!d) return { real: { degenerado: 'sin-mareas' } };
+    const sonda = sondaSomera(c, prng, 0.5, 4);
+    if (!sonda) return { real: { degenerado: 'sin-sondas' } };
+    const calado = elegir(prng, [1.5, 1.8, 2.0, 2.4, 2.8]);
+    const margen = elegir(prng, [0.5, 1.0]);
+    const necesaria = Math.round((calado + margen - sonda.prof) * 10) / 10;
+    const tramos = [];
+    for (let i = 0; i < d.eventos.length - 1; i++) {
+      const [ant, des] = [d.eventos[i], d.eventos[i + 1]];
+      if (des[2] > ant[2] && necesaria > ant[2] + 0.1 && necesaria < des[2] - 0.1) tramos.push([ant, des]);
+    }
+    if (!tramos.length) return { real: { degenerado: 'sin-tramo' } };
+    const [ant, des] = elegir(prng, tramos);
+    const hora = horaParaAltura(necesaria, ant, des);
+    return {
+      enunciado: `Tienes que cruzar ${nombreSonda(sonda)} en ${fPos(sonda.pos)} con un calado de ${fM_(calado)}, dejando al menos ${fM_(margen)} bajo la quilla. Anuario de ${d.nombre}, ${fFecha(d.fecha)}: ${d.eventos.map(e => `${e[0]} ${e[1]} ${fM_(e[2])}`).join(', ')}. ¿Qué altura de marea necesitas y a partir de qué hora, con la marea subiendo entre ${ant[1]} y ${des[1]}, puedes pasar?`,
+      visibles: { puerto: d.puertoId, fecha: d.fecha, eventos: d.eventos, sondaCarta: sonda.prof, sondaPos: sonda.pos, calado, margen, tramo: [ant[1], des[1]] },
+      real: { puerto: d.puertoId, tramo: [ant, des], punto: sonda.pos, respuesta: { altura: necesaria, hora } },
+      solucion: [
+        { texto: `Altura necesaria = calado + margen − sonda = ${fM_(calado)} + ${fM_(margen)} − ${fM_(sonda.prof)} = ${fM_(necesaria)}.`, valor: necesaria, trazo: { tipo: 'punto', pos: sonda.pos, simbolo: 'marca', etiqueta: `bajo ${String(sonda.prof).replace('.', ',')}` } },
+        { texto: `Tramo creciente ${ant[0]} ${ant[1]} (${fM_(ant[2])}) → ${des[0]} ${des[1]} (${fM_(des[2])}): carrera ${fM_(des[2] - ant[2])}, duración ${parsearHora(des[1]) - parsearHora(ant[1])} min. Hay que subir ${fM_(necesaria - ant[2])} desde la bajamar.` },
+        { texto: `Con la regla de los doceavos, esa altura se alcanza hacia las ${formatearHora(hora)}. Antes de esa hora el resguardo es menor que el margen.`, valor: hora }
+      ],
+      campos: [{ id: 'altura', etiqueta: 'Altura necesaria (m)', tipo: 'metros' }, { id: 'hora', etiqueta: 'Hora mínima', tipo: 'hora' }]
+    };
+  },
+
+  'gnss-vs-estima'(c, prng) {
+    const P = puntoAgua(c, prng);
+    if (!P) return { real: { degenerado: 'sin-agua' } };
+    const hora = entero(prng, 6, 18) * 60 + elegir(prng, [0, 10, 15, 20, 30, 40, 45, 50]);
+    const rv = entero(prng, 0, 359), velocidad = decimal(prng, 5, 12, 0.5), minutos = elegir(prng, [45, 60, 90, 120]);
+    const E = estimar(P, rv, velocidad, minutos);
+    if (!esAgua(c.carta, E, 0.5)) return { real: { degenerado: 'en-tierra' } };
+    const dist = decimal(prng, 0.4, 1.8, 0.1), rumboError = entero(prng, 0, 359);
+    const G = puntoDesde(E, rumboError, dist).map(v => redondear(v, 1 / 600));
+    if (!esAgua(c.carta, G, 0.3)) return { real: { degenerado: 'en-tierra' } };
+    const { rumbo, distancia } = rumboDistancia(E, G);
+    return {
+      enunciado: `A las ${formatearHora(hora)} estabas en ${fPos(P)} y has navegado al Rv ${fAng(rv)} a ${fNum(velocidad)} nudos durante ${minutos} min. El GNSS marca ahora ${fPos(G)}. Sitúa la estima y el punto GNSS y mide la discrepancia: rumbo y distancia desde la estima hasta la posición GNSS. Antes de aceptar el fix, comprueba que es coherente con la sonda y con lo que ves.`,
+      visibles: { desde: P, hora: formatearHora(hora), rv, velocidad, minutos, gnss: G },
+      real: { desde: P, llegada: E, gnss: G, rumbo, distancia, respuesta: { rumbo, distancia } },
+      solucion: [
+        { texto: `Estima: desde ${fPos(P)} traza Rv ${fAng(rv)} y lleva D = ${fNum(velocidad)} × ${fNum(minutos / 60, 2)} h = ${fM(velocidad * minutos / 60)}: ${fPos(E)}.`, trazo: { tipo: 'recta', desde: P, rumbo: rv, largoM: velocidad * minutos / 60 } },
+        { texto: `Marca la posición GNSS ${fPos(G)} con el símbolo de observada.`, trazo: { tipo: 'punto', pos: G, simbolo: 'observada', etiqueta: 'GNSS' } },
+        { texto: `Une estima y GNSS: la discrepancia es ${fM(distancia)} al ${fAng(rumbo)}. Puede deberse a corriente, abatimiento o error de corredera; si la carta o la sonda contradicen el GNSS, no lo aceptes sin más.`, trazo: { tipo: 'segmento', desde: E, hasta: G, etiqueta: `${fAng(rumbo)} · ${fM(distancia)}` }, valor: distancia }
+      ],
+      campos: [{ id: 'rumbo', etiqueta: 'Rumbo estima → GNSS', tipo: 'angulo' }, { id: 'distancia', etiqueta: 'Discrepancia (M)', tipo: 'millas' }]
+    };
+  },
+
+  'gnss-waypoint-mob'(c, prng) {
+    const P = puntoAgua(c, prng);
+    if (!P) return { real: { degenerado: 'sin-agua' } };
+    const hora = entero(prng, 6, 18) * 60 + elegir(prng, [0, 10, 15, 20, 30, 40, 45, 50]);
+    if (prng() < 0.5) {
+      // hombre al agua: seguimos navegando unos minutos antes de reaccionar
+      const rv = entero(prng, 0, 359), velocidad = decimal(prng, 5, 12, 0.5), minutos = elegir(prng, [2, 3, 4, 5, 6]);
+      const Q = estimar(P, rv, velocidad, minutos);
+      if (!esAgua(c.carta, Q, 0.3)) return { real: { degenerado: 'en-tierra' } };
+      const { rumbo, distancia } = rumboDistancia(Q, P);
+      return {
+        enunciado: `A las ${formatearHora(hora)} cae una persona al agua y pulsas MOB en el GNSS: registra ${fPos(P)}. Sigues al Rv ${fAng(rv)} a ${fNum(velocidad)} nudos y tardas ${minutos} min en tener el barco controlado. ¿Qué rumbo verdadero y qué distancia te separan de la posición MOB? Recuerda que la persona deriva: la posición MOB es el punto de partida de la búsqueda, no el final.`,
+        visibles: { desde: P, hora: formatearHora(hora), rv, velocidad, minutos, mob: P, variante: 'mob' },
+        real: { desde: P, llegada: Q, rumbo, distancia, respuesta: { rumbo, distancia } },
+        solucion: [
+          { texto: `Marca la posición MOB ${fPos(P)}.`, trazo: { tipo: 'punto', pos: P, simbolo: 'observada', etiqueta: 'MOB ' + formatearHora(hora) } },
+          { texto: `Tu situación tras ${minutos} min: ${fM(velocidad * minutos / 60)} al ${fAng(rv)} desde el MOB, ${fPos(Q)}.`, trazo: { tipo: 'recta', desde: P, rumbo: rv, largoM: velocidad * minutos / 60 } },
+          { texto: `Rumbo de vuelta: el recíproco corregido por la geometría, ${fAng(rumbo)}, a ${fM(distancia)}. Aproxímate despacio, a barlovento de la persona y con la hélice parada al llegar.`, valor: rumbo }
+        ],
+        campos: [{ id: 'rumbo', etiqueta: 'Rumbo verdadero al MOB', tipo: 'angulo' }, { id: 'distancia', etiqueta: 'Distancia (M)', tipo: 'millas' }]
+      };
+    }
+    const puerto = elegir(prng, c.carta.puertos);
+    const { rumbo, distancia } = rumboDistancia(P, puerto.pos);
+    if (distancia < 2) return { real: { degenerado: 'distancia-corta' } };
+    return {
+      enunciado: `A las ${formatearHora(hora)} el GNSS te sitúa en ${fPos(P)}. Introduces como waypoint ${puerto.nombre}, en ${fPos(puerto.pos)}. Comprueba en la carta el rumbo verdadero y la distancia al waypoint que debería mostrar el receptor.`,
+      visibles: { desde: P, hora: formatearHora(hora), waypoint: puerto.id, variante: 'waypoint' },
+      real: { desde: P, rumbo, distancia, respuesta: { rumbo, distancia } },
+      solucion: [
+        { texto: `Sitúa ${fPos(P)} y el waypoint ${fPos(puerto.pos)}.`, trazo: { tipo: 'punto', pos: P, simbolo: 'observada', etiqueta: formatearHora(hora) } },
+        { texto: `Une ambos puntos y mide con el transportador: Rv ${fAng(rumbo)}.`, trazo: { tipo: 'recta', desde: P, rumbo, largoM: distancia } },
+        { texto: `Mide la distancia en la escala de latitudes: ${fM(distancia)}. Si el receptor muestra otra cosa, revisa el datum y el waypoint introducido antes de fiarte.`, valor: distancia }
+      ],
+      campos: [{ id: 'rumbo', etiqueta: 'Rumbo verdadero al waypoint', tipo: 'angulo' }, { id: 'distancia', etiqueta: 'Distancia (M)', tipo: 'millas' }]
+    };
+  },
 
   'coordenadas-objeto'(c, prng) {
     const candidatos = [...c.carta.faros, ...c.carta.marcas, ...c.carta.boyas].filter(o => o.nombre);

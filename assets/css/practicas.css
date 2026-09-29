@@ -70,7 +70,7 @@ main.mesa { max-width: none; padding: 1.2rem 1.4rem 3rem; }
 .zona.banistas { stroke: var(--amarillo); stroke-dasharray: 4 3; fill: rgba(228,161,27,.08); }
 .zona-etiqueta { font-size: 10px; fill: var(--derrota); font-style: italic; }
 
-.sonda { font-size: 11px; fill: #35525f; font-family: 'IBM Plex Mono', ui-monospace, monospace !important; }
+.sonda { pointer-events: all !important; cursor: help; font-size: 11px; fill: #35525f; font-family: 'IBM Plex Mono', ui-monospace, monospace !important; }
 .sonda .dec { font-size: 8px; }
 .sonda .fondo { font-size: 8px; font-style: italic; fill: #6b7f89; }
 .peligro-prof { fill: #10202b; font-weight: 600; }
@@ -156,6 +156,8 @@ main.mesa { max-width: none; padding: 1.2rem 1.4rem 3rem; }
 .capa-solucion .trazo { stroke: var(--derrota); stroke-dasharray: 6 3; }
 .capa-solucion .trazo-punto { stroke: var(--derrota); }
 .capa-solucion .trazo-etiqueta { fill: var(--derrota); }
+.capa-solucion .referencia .trazo-punto { stroke: var(--amarillo); }
+.capa-solucion .referencia .trazo-etiqueta { fill: #b98614; }
 
 /* ---------- Portada de prácticas ---------- */
 

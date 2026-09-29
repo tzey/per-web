@@ -5,8 +5,8 @@
 
 import { pintarRail, UNIDADES, hhmmss } from '../comun.js';
 import { pintarCarta, crearZoomPan, fichaObjeto, buscarObjeto, dibujarTrazo } from './carta.js';
-import { generar, generarSimulacro, puntuar, TIPOS } from './ejercicios.js';
-import { formatearGrados, formatearAngulo, formatearMillas } from './geo.js';
+import { generar, generarSimulacro, puntuar, TIPOS, eventosPuerto, explicarResguardo } from './ejercicios.js';
+import { formatearGrados, formatearAngulo, formatearMillas, formatearHora, parsearHora, alturaMarea, eventosAlrededor } from './geo.js';
 import { crearCompasPuntas, crearTransportador, crearLapiz } from './instrumentos.js';
 import { crearSesion, sesionPrevia, registrarResultado } from './sesion.js';
 
@@ -20,7 +20,7 @@ const estado = {
   semilla: +(params.get('semilla') ?? Math.floor(Math.random() * 9000 + 1000)),
   modo: params.get('modo') ?? 'aprendizaje',
   anyo: +(params.get('anyo') ?? new Date().getFullYear()),
-  carta: null, tablilla: null, vista: null, zoom: null, ej: null, pistas: 0, lecturas: false,
+  carta: null, tablilla: null, mareas: null, marea: null, vista: null, zoom: null, ej: null, pistas: 0, lecturas: false,
   compas: null, transportador: null, lapiz: null, sesion: null,
   opciones: { viento: null, corriente: null }, errores: { desvioExtra: 0 }
 };
@@ -65,6 +65,16 @@ function describirVisibles(ej) {
   if (v.anyo) filas.push(['Año', String(v.anyo)]);
   if (v.usaTablilla) filas.push(['Desvío', 'según tablilla']);
   if (v.corriente) filas.push(['Corriente', `${v.corriente.intensidad} nudos al ${formatearAngulo(v.corriente.rumbo)}`]);
+  if (v.puerto) filas.push(['Puerto de mareas', estado.mareas?.puertos[v.puerto]?.nombre ?? v.puerto]);
+  if (v.fecha) filas.push(['Fecha', v.fecha.split('-').reverse().join('/')]);
+  if (v.eventos) v.eventos.forEach(e => filas.push([e[0] === 'PM' ? 'Pleamar' : 'Bajamar', `${e[1]} · ${String(e[2]).replace('.', ',')} m`]));
+  if (v.sondaCarta !== undefined) filas.push(['Sonda de carta', `${String(v.sondaCarta).replace('.', ',')} m`]);
+  if (v.sondaPos) filas.push(['Punto', fPos(v.sondaPos)]);
+  if (v.calado !== undefined) filas.push(['Calado', `${String(v.calado).replace('.', ',')} m`]);
+  if (v.margen !== undefined) filas.push(['Margen bajo quilla', `${String(v.margen).replace('.', ',')} m`]);
+  if (v.gnss) filas.push(['Posición GNSS', fPos(v.gnss)]);
+  if (v.mob) filas.push(['Posición MOB', fPos(v.mob)]);
+  if (v.waypoint) filas.push(['Waypoint', nombreDe(v.waypoint)]);
   return filas;
 }
 
@@ -84,7 +94,8 @@ function destacar(ids) {
 /* ---------- Ejercicio ---------- */
 
 function cargarEjercicio() {
-  estado.ej = generar(estado.tipo, { carta: estado.carta, tablilla: estado.tablilla, anyo: estado.anyo, semilla: estado.semilla, opciones: estado.opciones });
+  estado.ej = generar(estado.tipo, { carta: estado.carta, tablilla: estado.tablilla, mareas: estado.mareas, anyo: estado.anyo, semilla: estado.semilla, opciones: estado.opciones });
+  estado.marea = null;
   estado.pistas = 0;
   estado.vista.capas.solucion.replaceChildren();
   estado.sesion = crearSesion({ modo: estado.modo, cartaId: estado.cartaId, versionCarta: estado.carta.version, errores: estado.errores,
@@ -94,6 +105,7 @@ function cargarEjercicio() {
   const u = new URL(location); u.searchParams.set('tipo', estado.tipo); u.searchParams.set('semilla', estado.semilla); u.searchParams.set('carta', estado.cartaId);
   history.replaceState(null, '', u);
   destacar(objetosDelEjercicio(estado.ej));
+  if (estado.ej.visibles.sondaPos) dibujarTrazo(estado.vista.capas.solucion, estado.vista.proyeccion, { tipo: 'punto', pos: estado.ej.visibles.sondaPos, simbolo: 'marca', etiqueta: 'punto del ejercicio' }, 'referencia');
   pintarPanel();
 }
 
@@ -120,6 +132,14 @@ function pintarPanel() {
       <div class="explica" id="veredicto" hidden></div>
       <div class="pistas" id="pistas" hidden><ol></ol></div>
     </div>
+    ${ej.visibles.eventos ? `<div class="panel" id="panelMarea">
+      <h3>Marea en vivo</h3>
+      <p style="font-size:.9rem">Mueve la hora y observa cómo cambia la altura${ej.visibles.sondaCarta !== undefined ? ' y el resguardo' : ''}. Regla de los doceavos, etiquetada como aproximación docente.</p>
+      <label class="sans" style="font-size:.85rem;display:block">Hora <span class="mono" id="mareaHoraTxt"></span>
+        <input type="range" id="mareaHora" min="0" max="1439" step="5" style="width:100%"></label>
+      <p class="mono" id="mareaAltura" style="margin:.4rem 0 0;font-size:.9rem"></p>
+      <div class="nota" id="mareaAviso" hidden style="margin:.6rem 0 0"></div>
+    </div>` : ''}
     <details class="panel" style="padding:.8rem 1.1rem">
       <summary>Condiciones de prácticas (no salen en el examen)</summary>
       <div class="campos" style="margin:.6rem 0 0">
@@ -160,6 +180,36 @@ function pintarPanel() {
     cargarEjercicio();
   };
   $('#panel').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches('[data-campo]')) comprobar(); });
+  if (ej.visibles.eventos) activarMarea(ej);
+}
+
+/* ---------- Marea en vivo ---------- */
+
+function activarMarea(ej) {
+  const eventos = ej.visibles.eventos;
+  const rango = $('#mareaHora');
+  rango.value = ej.visibles.hora ? parsearHora(ej.visibles.hora) : parsearHora(eventos[0][1]) + 60;
+  const pinta = () => {
+    const hora = +rango.value;
+    $('#mareaHoraTxt').textContent = formatearHora(hora);
+    const [ant, des] = eventosAlrededor(hora, eventos);
+    if (!ant || !des) {
+      $('#mareaAltura').textContent = 'Fuera del tramo cubierto por los eventos del día.';
+      $('#mareaAviso').hidden = true; estado.marea = null; return;
+    }
+    const altura = alturaMarea(hora, ant, des);
+    estado.marea = { hora, altura };
+    $('#mareaAltura').textContent = `Altura ${altura.toFixed(2).replace('.', ',')} m (entre ${ant[0]} ${ant[1]} ${String(ant[2]).replace('.', ',')} m y ${des[0]} ${des[1]} ${String(des[2]).replace('.', ',')} m)`;
+    const aviso = $('#mareaAviso');
+    if (ej.visibles.sondaCarta !== undefined && ej.visibles.calado !== undefined) {
+      const r = explicarResguardo({ sondaCarta: ej.visibles.sondaCarta, alturaMarea: altura, calado: ej.visibles.calado, margen: ej.visibles.margen ?? 0 });
+      aviso.hidden = false;
+      aviso.className = `nota ${r.seguro ? '' : 'aviso'}`;
+      aviso.innerHTML = `<b>${r.seguro ? 'Resguardo suficiente' : 'Alerta de resguardo'}</b><p>${r.texto}</p>`;
+    } else aviso.hidden = true;
+  };
+  rango.addEventListener('input', pinta);
+  pinta();
 }
 
 function marcador(campo) {
@@ -328,6 +378,22 @@ function activarFichas() {
     marco.append(div);
   };
   estado.vista.capas.objetos.addEventListener('click', ev => { const o = ev.target.closest('.objeto'); if (o) abrir(o.dataset.id); });
+  $('#carta').addEventListener('click', ev => {
+    const s = ev.target.closest('.sonda');
+    if (!s || !s.dataset.prof) return;
+    marco.querySelector('.ficha')?.remove();
+    const prof = +s.dataset.prof;
+    const fondo = ({ A: 'arena', F: 'fango', P: 'piedra', R: 'roca', Cs: 'cascajo', Alg: 'algas' })[s.dataset.fondo] ?? s.dataset.fondo;
+    const filas = [['Sonda de carta', `${String(prof).replace('.', ',')} m`], ['Referida a', estado.carta.meta.ceroHidrografico.toLowerCase()]];
+    if (fondo) filas.push(['Naturaleza del fondo', fondo]);
+    if (estado.marea) filas.push([`Sonda real a las ${formatearHora(estado.marea.hora)}`, `${(prof + estado.marea.altura).toFixed(1).replace('.', ',')} m (marea ${estado.marea.altura.toFixed(2).replace('.', ',')} m)`]);
+    else filas.push(['Sonda real', 'activa la marea en vivo en un ejercicio de mareas']);
+    const div = document.createElement('div');
+    div.className = 'ficha';
+    div.innerHTML = `<button aria-label="Cerrar">×</button><h4>Sonda</h4><dl>${filas.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
+    div.querySelector('button').onclick = () => div.remove();
+    marco.append(div);
+  });
   estado.vista.capas.objetos.addEventListener('keydown', ev => {
     const o = ev.target.closest('.objeto');
     if (o && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abrir(o.dataset.id); }
@@ -338,7 +404,7 @@ function activarFichas() {
 
 async function iniciar() {
   try {
-    [estado.carta, estado.tablilla] = await Promise.all([cargarJson(`data/cartas/${estado.cartaId}.json`), cargarJson('data/tablilla-desvios.json')]);
+    [estado.carta, estado.tablilla, estado.mareas] = await Promise.all([cargarJson(`data/cartas/${estado.cartaId}.json`), cargarJson('data/tablilla-desvios.json'), cargarJson('data/mareas-didacticas.json')]);
   } catch {
     $('#estadoCarga').textContent = 'No se han podido cargar los datos. Arranca el sitio desde un servidor local: node tools/servir.js';
     return;
