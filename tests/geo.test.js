@@ -164,3 +164,10 @@ test('hayGarreo con deriva de 4° sobre tolerancia 3°', () => {
   assert.equal(geo.hayGarreo([45, 130], [46, 132]), false);
   assert.equal(geo.hayGarreo([358], [2]), true);
 });
+
+test('dentroDePoligono por trazado de rayos', () => {
+  const cuadrado = [[36, -13], [36, -12], [37, -12], [37, -13], [36, -13]];
+  assert.equal(geo.dentroDePoligono([36.5, -12.5], cuadrado), true);
+  assert.equal(geo.dentroDePoligono([35.5, -12.5], cuadrado), false);
+  assert.equal(geo.dentroDePoligono([36.5, -11.5], cuadrado), false);
+});

@@ -1,0 +1,13 @@
+{
+  "compas": "Aguja magistral · embarcación didáctica",
+  "fecha": "2026-01",
+  "paso": 15,
+  "filas": [
+    {"ra":0,"desvio":1.0},{"ra":15,"desvio":1.8},{"ra":30,"desvio":2.4},{"ra":45,"desvio":2.8},
+    {"ra":60,"desvio":2.9},{"ra":75,"desvio":2.6},{"ra":90,"desvio":2.0},{"ra":105,"desvio":1.2},
+    {"ra":120,"desvio":0.3},{"ra":135,"desvio":-0.6},{"ra":150,"desvio":-1.4},{"ra":165,"desvio":-2.0},
+    {"ra":180,"desvio":-2.4},{"ra":195,"desvio":-2.6},{"ra":210,"desvio":-2.5},{"ra":225,"desvio":-2.2},
+    {"ra":240,"desvio":-1.7},{"ra":255,"desvio":-1.1},{"ra":270,"desvio":-0.5},{"ra":285,"desvio":0.0},
+    {"ra":300,"desvio":0.3},{"ra":315,"desvio":0.5},{"ra":330,"desvio":0.7},{"ra":345,"desvio":0.9}
+  ]
+}

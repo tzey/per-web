@@ -219,3 +219,15 @@ export function radioBorneo(eslora, cadena, profundidad) {
 export function hayGarreo(demorasControl, demorasActuales, toleranciaGrados = 3) {
   return demorasControl.some((d, i) => Math.abs(diferenciaAngular(d, demorasActuales[i])) > toleranciaGrados);
 }
+
+/* ---------- Geometría de carta ---------- */
+
+/** Punto [lat,lon] dentro de un polígono cerrado de [lat,lon], por trazado de rayos. */
+export function dentroDePoligono(p, poligono) {
+  let dentro = false;
+  for (let i = 0, j = poligono.length - 1; i < poligono.length; j = i++) {
+    const [yi, xi] = poligono[i], [yj, xj] = poligono[j];
+    if ((yi > p[0]) !== (yj > p[0]) && p[1] < (xj - xi) * (p[0] - yi) / (yj - yi) + xi) dentro = !dentro;
+  }
+  return dentro;
+}
