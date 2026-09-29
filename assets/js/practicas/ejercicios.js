@@ -10,7 +10,8 @@ import {
   parsearHora, formatearHora, rumboDistancia, puntoDesde, correccionTotal, rumboAguja,
   declinacionActualizada, desvioPorTablilla, estima as estimar, tiempoParaDistancia,
   cortarRectas, calidadCorte, situacionDemoraDistancia,
-  alturaMarea, horaParaAltura, eventosAlrededor, sondaReal, resguardo as calcResguardo
+  alturaMarea, horaParaAltura, eventosAlrededor, sondaReal, resguardo as calcResguardo,
+  radioBorneo, dentroDePoligono, MILLA_M
 } from './geo.js';
 import { enTierra, buscarObjeto } from './carta.js';
 
@@ -43,8 +44,8 @@ const redondear = (v, paso) => Math.round(v / paso) * paso;
 /* ---------- Tolerancias y catálogo ---------- */
 
 export const TOLERANCIAS = {
-  100000: { minutosLat: 0.5, minutosLon: 0.6, grados: 1, millas: 0.3, metros: 0.1, minutosTiempo: 3 },
-  10000:  { minutosLat: 0.05, minutosLon: 0.06, grados: 1, millas: 0.03, metros: 0.1, minutosTiempo: 2 }
+  100000: { minutosLat: 0.5, minutosLon: 0.6, grados: 1, millas: 0.3, metros: 0.1, metrosLargo: 10, minutosTiempo: 3 },
+  10000:  { minutosLat: 0.05, minutosLon: 0.06, grados: 1, millas: 0.03, metros: 0.1, metrosLargo: 5, minutosTiempo: 2 }
 };
 
 export const TIPOS = [
@@ -61,7 +62,9 @@ export const TIPOS = [
   { id: 'marea-resguardo-paso', bloque: 'mareas', fase: 2, titulo: 'Profundidad real y resguardo', cartas: ['costera'] },
   { id: 'marea-hora-minima', bloque: 'mareas', fase: 2, titulo: 'Hora mínima para pasar un bajo', cartas: ['costera'] },
   { id: 'gnss-vs-estima', bloque: 'gnss', fase: 2, titulo: 'GNSS frente a estima', cartas: ['costera'] },
-  { id: 'gnss-waypoint-mob', bloque: 'gnss', fase: 2, titulo: 'Waypoint y hombre al agua', cartas: ['costera'] }
+  { id: 'gnss-waypoint-mob', bloque: 'gnss', fase: 2, titulo: 'Waypoint y hombre al agua', cartas: ['costera'] },
+  { id: 'fondeo-borneo-bajamar', bloque: 'fondeo', fase: 2, titulo: 'Radio de borneo y bajamar', cartas: ['portulano'] },
+  { id: 'fondeo-garreo', bloque: 'fondeo', fase: 2, titulo: 'Demoras de control y garreo', cartas: ['portulano'] }
 ];
 
 /* ---------- Formato ---------- */
@@ -121,13 +124,19 @@ const ALCANCE_DEFECTO = { faros: 20, marcas: 8, boyas: 5 };
 
 function visible(carta, P, obj) {
   const { distancia } = rumboDistancia(P, obj.pos);
-  if (distancia > (obj.alcance ?? ALCANCE_DEFECTO[obj.coleccion] ?? 8) || distancia < 0.3) return false;
+  if (distancia > (obj.alcance ?? ALCANCE_DEFECTO[obj.coleccion] ?? 8) || distancia < (carta.meta.tipo === 'portulano' ? 0.08 : 0.3)) return false;
+  // La visual puede acabar en tierra (faro, torre), pero no cruzar una tierra
+  // intermedia y volver al agua: la primera tierra debe ser la del objeto.
   const propioEnTierra = enTierra(carta, obj.pos);
-  for (let t = 0.03; t <= (propioEnTierra ? 0.9 : 0.98); t += 0.03) {
+  let primeraTierra = null;
+  for (let t = 0.03; t <= 0.97; t += 0.02) {
     const q = [P[0] + (obj.pos[0] - P[0]) * t, P[1] + (obj.pos[1] - P[1]) * t];
-    if (enTierra(carta, q)) return false;
+    const tierra = enTierra(carta, q);
+    if (tierra && primeraTierra === null) primeraTierra = t;
+    else if (!tierra && primeraTierra !== null) return false;
   }
-  return true;
+  if (primeraTierra === null) return true;
+  return propioEnTierra && primeraTierra >= 0.4;
 }
 
 function objetosVisibles(c, P, colecciones = ['faros', 'marcas', 'boyas']) {
@@ -220,9 +229,125 @@ function sondaSomera(c, prng, min = 0.8, max = 8) {
 }
 const nombreSonda = s => s.nombre ? `${s.nombre} (sonda ${fM_(s.prof)})` : `un punto de sonda ${fM_(s.prof)}`;
 
+/* ---------- Fondeo ---------- */
+
+function puntoEnZona(c, prng, zona, margenM = 0.03) {
+  const lats = zona.poligono.map(p => p[0]), lons = zona.poligono.map(p => p[1]);
+  const [a, b, d, e] = [Math.min(...lats), Math.max(...lats), Math.min(...lons), Math.max(...lons)];
+  for (let i = 0; i < 100; i++) {
+    const p = [redondear(a + prng() * (b - a), 1 / 6000), redondear(d + prng() * (e - d), 1 / 6000)];
+    if (dentroDePoligono(p, zona.poligono) && esAgua(c.carta, p, margenM)) return p;
+  }
+  return null;
+}
+
+function sondaEn(c, p) {
+  let mejor = null, dist = Infinity;
+  for (const s of c.carta.sondas) { const d = rumboDistancia(p, s.pos).distancia; if (d < dist) { dist = d; mejor = s; } }
+  return mejor?.prof ?? null;
+}
+
+const distanciaSegmentoM = (p, a, b) => {
+  const k = Math.cos(p[0] * Math.PI / 180);
+  const P = [p[1] * 60 * k, p[0] * 60], A = [a[1] * 60 * k, a[0] * 60], B = [b[1] * 60 * k, b[0] * 60];
+  const ab = [B[0] - A[0], B[1] - A[1]], ap = [P[0] - A[0], P[1] - A[1]];
+  const t = Math.max(0, Math.min(1, (ap[0] * ab[0] + ap[1] * ab[1]) / (ab[0] ** 2 + ab[1] ** 2 || 1)));
+  return Math.hypot(P[0] - A[0] - ab[0] * t, P[1] - A[1] - ab[1] * t) * MILLA_M;
+};
+
+/** Qué toca un círculo de borneo de `radioM` metros centrado en p. */
+function conflictosBorneo(carta, p, radioM) {
+  const salida = [];
+  const radioMillas = radioM / MILLA_M;
+  for (let a = 0; a < 360; a += 15) if (enTierra(carta, puntoDesde(p, a, radioMillas))) { salida.push('tierra'); break; }
+  for (const z of carta.zonas) {
+    if (z.tipo === 'fondeadero') continue;
+    const puntos = z.linea ?? z.poligono;
+    let toca = false;
+    for (let i = 0; i < puntos.length - 1; i++) if (distanciaSegmentoM(p, puntos[i], puntos[i + 1]) <= radioM) toca = true;
+    if (z.poligono && dentroDePoligono(p, z.poligono)) toca = true;
+    if (toca) salida.push(z.etiqueta ?? z.tipo);
+  }
+  for (const b of carta.boyas) if (rumboDistancia(p, b.pos).distancia * MILLA_M <= radioM) salida.push(b.nombre ?? b.id);
+  return salida;
+}
+
 /* ---------- Generadores ---------- */
 
 const GENERADORES = {
+
+  'fondeo-borneo-bajamar'(c, prng) {
+    const zona = c.carta.zonas.find(z => z.tipo === 'fondeadero');
+    if (!zona) return { real: { degenerado: 'sin-fondeadero' } };
+    const P = puntoEnZona(c, prng, zona);
+    if (!P) return { real: { degenerado: 'sin-agua' } };
+    const d = diaDeMareas(c, prng);
+    if (!d) return { real: { degenerado: 'sin-mareas' } };
+    const sonda = sondaEn(c, P);
+    if (sonda === null) return { real: { degenerado: 'sin-sondas' } };
+    const pm = Math.max(...d.eventos.map(e => e[2])), bm = Math.min(...d.eventos.map(e => e[2]));
+    const profundidadPM = Math.round((sonda + pm) * 10) / 10, profundidadBM = Math.round((sonda + bm) * 10) / 10;
+    const eslora = elegir(prng, [8, 10, 12]);
+    const factor = elegir(prng, [3, 4, 5]);
+    const cadena = Math.ceil(factor * profundidadPM / 5) * 5;
+    const calado = elegir(prng, [1.2, 1.5, 1.8, 2.0]);
+    const radio = radioBorneo(eslora, cadena, profundidadPM);
+    const resguardoBM = Math.round((profundidadBM - calado) * 100) / 100;
+    if (resguardoBM < -3) return { real: { degenerado: 'sin-agua' } };
+    const conflictos = conflictosBorneo(c.carta, P, radio);
+    return {
+      enunciado: `Fondeas en ${fPos(P)}, dentro del fondeadero, sobre una sonda de carta de ${fM_(sonda)}. Barco de ${eslora} m de eslora y ${fM_(calado)} de calado; largas ${cadena} m de cadena. Anuario de ${d.nombre}, ${fFecha(d.fecha)}: ${d.eventos.map(e => `${e[0]} ${e[1]} ${fM_(e[2])}`).join(', ')}. Halla el radio de borneo en pleamar, la profundidad en la bajamar y el resguardo bajo la quilla en ese momento.`,
+      visibles: { situacion: P, puerto: d.puertoId, fecha: d.fecha, eventos: d.eventos, sondaCarta: sonda, sondaPos: P, eslora, cadena, calado },
+      real: { situacion: P, sonda, profundidadPM, profundidadBM, radio, conflictos, alerta: explicarResguardo({ sondaCarta: sonda, alturaMarea: bm, calado, margen: 0.5 }), respuesta: { radio, profundidadBM, resguardoBM } },
+      solucion: [
+        { texto: `Sitúa el fondeo en ${fPos(P)}.`, trazo: { tipo: 'punto', pos: P, simbolo: 'marca', etiqueta: 'ancla' } },
+        { texto: `Profundidad en pleamar: ${fM_(sonda)} + ${fM_(pm)} = ${fM_(profundidadPM)}. El radio de borneo se calcula con la mayor profundidad, porque la cadena tendida es entonces menor.` },
+        { texto: `Radio = √(cadena² − profundidad²) + eslora = √(${cadena}² − ${fNum(profundidadPM)}²) + ${eslora} = ${fNum(radio, 0)} m.`, valor: radio, trazo: { tipo: 'circulo', centro: P, radioM: radio / MILLA_M } },
+        { texto: `Profundidad en bajamar: ${fM_(sonda)} + ${fM_(bm)} = ${fM_(profundidadBM)}. Resguardo = ${fM_(profundidadBM)} − ${fM_(calado)} = ${fM_(resguardoBM)}${resguardoBM < 0.5 ? ': insuficiente, busca más fondo o espera' : ''}.`, valor: resguardoBM },
+        { texto: conflictos.length ? `El círculo de borneo alcanza: ${conflictos.join(', ')}. Cambia de punto o acorta cadena.` : 'El círculo de borneo no toca cable, bañistas, boyas ni tierra.' }
+      ],
+      campos: [{ id: 'radio', etiqueta: 'Radio de borneo (m)', tipo: 'metrosLargo' }, { id: 'profundidadBM', etiqueta: 'Profundidad en bajamar (m)', tipo: 'metros' }, { id: 'resguardoBM', etiqueta: 'Resguardo en bajamar (m)', tipo: 'metros' }]
+    };
+  },
+
+  'fondeo-garreo'(c, prng) {
+    const zona = c.carta.zonas.find(z => z.tipo === 'fondeadero');
+    if (!zona) return { real: { degenerado: 'sin-fondeadero' } };
+    const P = puntoEnZona(c, prng, zona);
+    if (!P) return { real: { degenerado: 'sin-agua' } };
+    const vis = objetosVisibles(c, P, ['faros', 'marcas']);
+    const pares = [];
+    for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
+      let ang = Math.abs(diferenciaAngular(rumboDistancia(P, vis[i].pos).rumbo, rumboDistancia(P, vis[j].pos).rumbo)); if (ang > 90) ang = 180 - ang;
+      if (ang >= 40) pares.push([vis[i], vis[j]]);
+    }
+    if (!pares.length) return { real: { degenerado: 'sin-objetos' } };
+    const [a, b] = elegir(prng, pares);
+    const control = [a, b].map(o => redondear(rumboDistancia(P, o.pos).rumbo, 0.5));
+    const garreaReal = prng() < 0.5;
+    const desplazamientoReal = garreaReal ? entero(prng, 25, 90) : entero(prng, 0, 6);
+    const direccion = entero(prng, 0, 359);
+    const P2 = puntoDesde(P, direccion, desplazamientoReal / MILLA_M);
+    if (!esAgua(c.carta, P2, 0.01)) return { real: { degenerado: 'en-tierra' } };
+    const actuales = [a, b].map(o => redondear(rumboDistancia(P2, o.pos).rumbo, 0.5));
+    const corte = cortarRectas(a.pos, reciproco(actuales[0]), b.pos, reciproco(actuales[1]));
+    if (!corte) return { real: { degenerado: 'paralelas' } };
+    const desplazamiento = Math.round(rumboDistancia(P, corte.punto).distancia * MILLA_M);
+    const garrea = desplazamiento > 15;
+    const hora = entero(prng, 6, 20) * 60 + elegir(prng, [0, 15, 30, 45]);
+    return {
+      enunciado: `Fondeado en ${fPos(P)} a las ${formatearHora(hora)}, tomas demoras de control: ${fAng(control[0])} a ${nombre(a)} y ${fAng(control[1])} a ${nombre(b)}. Una hora después, con el mismo viento, lees ${fAng(actuales[0])} y ${fAng(actuales[1])}. Sitúa la nueva posición por las dos demoras y halla cuántos metros se ha desplazado el barco. Con más de 15 m, considera que el ancla garrea.`,
+      visibles: { situacion: P, hora: formatearHora(hora), objetos: [a.id, b.id], demorasControl: control, demorasActuales: actuales },
+      real: { situacion: P, situacionActual: corte.punto, anguloCorte: corte.anguloCorte, garrea, desplazamientoReal, respuesta: { desplazamiento } },
+      solucion: [
+        { texto: `Traza desde ${nombre(a)} y ${nombre(b)} las recíprocas de las demoras de control (${fAng(reciproco(control[0]))} y ${fAng(reciproco(control[1]))}): se cortan en el fondeo.`, trazo: { tipo: 'punto', pos: P, simbolo: 'observada', etiqueta: formatearHora(hora) } },
+        { texto: `Traza las recíprocas de las demoras actuales (${fAng(reciproco(actuales[0]))} y ${fAng(reciproco(actuales[1]))}).`, trazo: { tipo: 'recta', desde: a.pos, rumbo: reciproco(actuales[0]), largoM: rumboDistancia(a.pos, corte.punto).distancia + 0.05 } },
+        { texto: `El nuevo corte está en ${fPos(corte.punto)}.`, trazo: { tipo: 'recta', desde: b.pos, rumbo: reciproco(actuales[1]), largoM: rumboDistancia(b.pos, corte.punto).distancia + 0.05 } },
+        { texto: `Distancia entre ambos puntos, medida en la escala de latitudes: ${desplazamiento} m. ${garrea ? 'Supera los 15 m: el ancla garrea; larga más cadena o vuelve a fondear.' : 'Está dentro del borneo normal y del error de las demoras: el ancla aguanta. Repite las demoras periódicamente.'}`, valor: desplazamiento, trazo: { tipo: 'punto', pos: corte.punto, simbolo: 'observada', etiqueta: formatearHora(hora + 60) } }
+      ],
+      campos: [{ id: 'desplazamiento', etiqueta: 'Desplazamiento (m)', tipo: 'metrosLargo' }]
+    };
+  },
 
   'marea-altura-hora'(c, prng) {
     const d = diaDeMareas(c, prng);
@@ -630,6 +755,7 @@ function toleranciaDe(campo, tol) {
     case 'angulo': case 'angulo-signo': return tol.grados;
     case 'millas': return tol.millas;
     case 'hora': case 'minutos': return tol.minutosTiempo;
+    case 'metrosLargo': return tol.metrosLargo;
     default: return tol.metros;
   }
 }

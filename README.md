@@ -117,7 +117,7 @@ EOF
 
 El ejercicio de carta del examen se resuelve sobre la carta oficial de enseñanza del Instituto Hidrográfico de la Marina, que entrega el tribunal y que no puede reproducirse aquí por derechos. `carta.html` cubre los procedimientos de trazado paso a paso y plantea ejercicios numéricos autosuficientes que entrenan el mismo razonamiento.
 
-La mesa de carta (`mesa.html`) trabaja sobre **cartas didácticas sintéticas**: costa, sondas, faros y topónimos inventados, situados en una zona del Atlántico sin tierra real y con el sello «CARTA DIDÁCTICA · GEOGRAFÍA FICTICIA» en el cartucho, el margen y el título accesible del SVG. La proyección es Mercator real (escala de latitudes variable), así que medir en la escala de longitudes o lejos de la latitud navegada da un resultado distinto, y el compás virtual lo detecta. La carta costera se genera con `python3 tools/generar-carta-costera.py`; el JSON resultante es lo que se versiona.
+La mesa de carta (`mesa.html`) trabaja sobre **cartas didácticas sintéticas**: costa, sondas, faros y topónimos inventados, situados en una zona del Atlántico sin tierra real y con el sello «CARTA DIDÁCTICA · GEOGRAFÍA FICTICIA» en el cartucho, el margen y el título accesible del SVG. La proyección es Mercator real (escala de latitudes variable), así que medir en la escala de longitudes o lejos de la latitud navegada da un resultado distinto, y el compás virtual lo detecta. La carta costera se genera con `python3 tools/generar-carta-costera.py`, el portulano con `python3 tools/generar-portulano.py` y el anuario de mareas sintético con `python3 tools/generar-mareas.py`; los JSON resultantes son lo que se versiona.
 
 ### Esquema de una carta
 
