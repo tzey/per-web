@@ -78,6 +78,7 @@ main.mesa { max-width: none; padding: 1.2rem 1.4rem 3rem; }
 .objeto { cursor: pointer; pointer-events: all; }
 .objeto text { pointer-events: all !important; }
 .objeto .hit { fill: transparent; stroke: none; }
+.objeto.destacado .hit { fill: rgba(214,0,110,.12); stroke: var(--derrota); stroke-width: 1.2; stroke-dasharray: 3 2; }
 .objeto:focus-visible { outline: none; }
 .objeto:focus-visible > circle, .objeto:focus-visible > path, .objeto:focus-visible > rect { filter: drop-shadow(0 0 3px var(--derrota)); }
 .faro circle { fill: #10202b; }

@@ -461,10 +461,52 @@ export function crearZoomPan(svg, mundo, { min = 1, max = 8, esFondo = () => tru
   const soltar = ev => { punteros.delete(ev.pointerId); if (punteros.size < 2) pinza = null; if (!punteros.size) arrastre = null; };
   svg.addEventListener('pointerup', soltar); svg.addEventListener('pointercancel', soltar);
 
-  return { escala: () => k, reiniciar: () => { k = 1; tx = ty = 0; aplicar(); }, aViewBox, zoomEn };
+  return { escala: () => k, traslacion: () => ({ x: tx, y: ty }), reiniciar: () => { k = 1; tx = ty = 0; aplicar(); }, aViewBox, zoomEn };
 }
 
 /** ¿Está el punto geográfico en tierra según los polígonos de costa? */
 export function enTierra(carta, p) {
   return carta.costa.some(c => dentroDePoligono(p, c.poligono));
+}
+
+/* ---------- Trazos (solución y lápiz) ---------- */
+
+/**
+ * Dibuja un trazo geográfico en una capa. Tipos:
+ *  recta   { desde:[lat,lon], rumbo, largoM, etiqueta? }
+ *  segmento{ desde, hasta, etiqueta? }
+ *  punto   { pos, simbolo: 'observada'|'estima'|'marca', etiqueta? }
+ *  circulo { centro, radioM }
+ * Devuelve el elemento creado.
+ */
+export function dibujarTrazo(capa, proy, trazo, clase = '') {
+  const g = el('g', { class: `trazo-g ${clase}`.trim() });
+  const linea = (a, b, etiqueta) => {
+    const A = proy.aPx(a), B = proy.aPx(b);
+    g.append(el('line', { class: 'trazo', x1: A.x, y1: A.y, x2: B.x, y2: B.y }));
+    if (etiqueta) {
+      const ang = Math.atan2(B.y - A.y, B.x - A.x) * 180 / Math.PI;
+      const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+      g.append(texto(0, -4, etiqueta, { class: 'trazo-etiqueta', 'text-anchor': 'middle', transform: `translate(${mx} ${my}) rotate(${ang > 90 || ang < -90 ? ang + 180 : ang})` }));
+    }
+  };
+  switch (trazo.tipo) {
+    case 'recta': linea(trazo.desde, puntoDesde(trazo.desde, trazo.rumbo, trazo.largoM), trazo.etiqueta ?? `${formatearAngulo(trazo.rumbo)}`); break;
+    case 'segmento': linea(trazo.desde, trazo.hasta, trazo.etiqueta); break;
+    case 'punto': {
+      const { x, y } = proy.aPx(trazo.pos);
+      if (trazo.simbolo === 'observada') g.append(el('circle', { class: 'trazo-punto observada', cx: x, cy: y, r: 3 }), el('circle', { class: 'trazo-punto', cx: x, cy: y, r: 7 }));
+      else if (trazo.simbolo === 'estima') g.append(el('circle', { class: 'trazo-punto', cx: x, cy: y, r: 5 }), el('path', { class: 'trazo-punto', d: `M${x - 7},${y} H${x + 7} M${x},${y - 7} V${y + 7}` }));
+      else g.append(el('path', { class: 'trazo-punto', d: `M${x - 5},${y - 5} L${x + 5},${y + 5} M${x - 5},${y + 5} L${x + 5},${y - 5}` }));
+      if (trazo.etiqueta) g.append(texto(x + 9, y - 6, trazo.etiqueta, { class: 'trazo-etiqueta' }));
+      break;
+    }
+    case 'circulo': {
+      const { x, y } = proy.aPx(trazo.centro);
+      g.append(el('circle', { class: 'trazo', cx: x, cy: y, r: trazo.radioM * proy.pxPorMinutoLat(trazo.centro[0]) }));
+      break;
+    }
+  }
+  capa.append(g);
+  return g;
 }

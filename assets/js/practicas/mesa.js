@@ -1,16 +1,35 @@
 /* ============================================================
-   Controlador de mesa.html: carga la carta, pinta, zoom y fichas.
+   Controlador de mesa.html: carga carta y ejercicio, panel de
+   enunciado, pistas, solución, comprobación y lecturas.
    ============================================================ */
 
-import { pintarRail } from '../comun.js';
-import { pintarCarta, crearZoomPan, fichaObjeto } from './carta.js';
+import { pintarRail, UNIDADES } from '../comun.js';
+import { pintarCarta, crearZoomPan, fichaObjeto, buscarObjeto, dibujarTrazo } from './carta.js';
+import { generar, TIPOS } from './ejercicios.js';
+import { formatearGrados, formatearAngulo } from './geo.js';
 
 pintarRail('mesa.html');
 
 const $ = s => document.querySelector(s);
 const params = new URLSearchParams(location.search);
-const cartaId = params.get('carta') ?? 'estrecho-didactico';
-const anyo = +(params.get('anyo') ?? new Date().getFullYear());
+const estado = {
+  cartaId: params.get('carta') ?? 'estrecho-didactico',
+  tipo: params.get('tipo') ?? 'situacion-dos-demoras',
+  semilla: +(params.get('semilla') ?? Math.floor(Math.random() * 9000 + 1000)),
+  modo: params.get('modo') ?? 'aprendizaje',
+  anyo: +(params.get('anyo') ?? new Date().getFullYear()),
+  carta: null, tablilla: null, vista: null, zoom: null, ej: null, pistas: 0, lecturas: false
+};
+
+const AVISOS = {
+  reciproco: 'Has leído el recíproco: el transportador estaba con el 0 hacia el sur, o has llevado la demora desde el objeto en lugar de hacia él.',
+  'signo-ct': 'Corrección total con el signo cambiado: del verdadero al de aguja se resta, Ra = Rv − Ct.',
+  'sin-desvio': 'Solo has aplicado la declinación; falta el desvío de la tablilla.',
+  'signo-invertido': 'Signo invertido: este positivo, oeste negativo.',
+  'este-oeste': 'Longitud con el hemisferio cambiado: en esta carta toda la longitud es W.',
+  'lado-contrario': 'Has dejado el peligro por la banda contraria.',
+  'sin-resguardo': 'Has puesto proa al peligro: falta el ángulo de resguardo.'
+};
 
 async function cargarJson(ruta) {
   const r = await fetch(ruta);
@@ -18,24 +37,185 @@ async function cargarJson(ruta) {
   return r.json();
 }
 
-async function iniciar() {
-  let carta;
-  try {
-    carta = await cargarJson(`data/cartas/${cartaId}.json`);
-  } catch {
-    $('#estadoCarga').textContent = 'No se ha podido cargar la carta. Arranca el sitio desde un servidor local: python3 -m http.server';
-    return;
+const fPos = p => `${formatearGrados(p[0], 'lat')} · ${formatearGrados(p[1], 'lon')}`;
+const nombreDe = id => { const o = buscarObjeto(estado.carta, id); return o?.nombre ?? o?.descripcion ?? id; };
+
+/** Datos del enunciado en forma de tabla, para no depender de leer bien el texto. */
+function describirVisibles(ej) {
+  const v = ej.visibles, filas = [];
+  if (v.hora) filas.push(['Hora', v.hora]);
+  if (v.desde) filas.push(['Situación de partida', fPos(v.desde)]);
+  if (v.objeto) filas.push(['Objeto', nombreDe(v.objeto)]);
+  if (v.enfilacion) filas.push(['Enfilación', nombreDe(v.enfilacion)]);
+  if (v.peligro) filas.push(['Peligro', nombreDe(v.peligro)]);
+  if (v.demoras) v.demoras.forEach((d, i) => filas.push([`Demora ${v.tipoDemora === 'aguja' ? 'de aguja' : 'verdadera'} ${i + 1}`, `${formatearAngulo(d.valor)} a ${nombreDe(d.objeto)}`]));
+  if (v.ct !== undefined && v.ct !== null) filas.push(['Corrección total', `${v.ct < 0 ? '−' : '+'}${Math.abs(v.ct).toFixed(1).replace('.', ',')}°`]);
+  if (v.da !== undefined) filas.push(['Demora de aguja', formatearAngulo(v.da)]);
+  if (v.dv2 !== undefined) filas.push(['Demora verdadera', formatearAngulo(v.dv2)]);
+  if (v.dv !== undefined) filas.push(['Demora verdadera', formatearAngulo(v.dv)]);
+  if (v.distancia !== undefined) filas.push(['Distancia', `${String(v.distancia).replace('.', ',')} M`]);
+  if (v.rv !== undefined) filas.push(['Rumbo verdadero', formatearAngulo(v.rv)]);
+  if (v.velocidad !== undefined) filas.push(['Velocidad', `${String(v.velocidad).replace('.', ',')} nudos`]);
+  if (v.minutos !== undefined) filas.push(['Tiempo navegado', `${v.minutos} min`]);
+  if (v.resguardo !== undefined) filas.push(['Resguardo', `${String(v.resguardo).replace('.', ',')} M por ${v.lado}`]);
+  if (v.anyo) filas.push(['Año', String(v.anyo)]);
+  if (v.usaTablilla) filas.push(['Desvío', 'según tablilla']);
+  if (v.corriente) filas.push(['Corriente', `${v.corriente.intensidad} nudos al ${formatearAngulo(v.corriente.rumbo)}`]);
+  return filas;
+}
+
+function objetosDelEjercicio(ej) {
+  const v = ej.visibles, ids = [];
+  for (const k of ['objeto', 'peligro']) if (v[k]) ids.push(v[k]);
+  if (v.demoras) ids.push(...v.demoras.map(d => d.objeto));
+  if (v.enfilacion) { const e = buscarObjeto(estado.carta, v.enfilacion); if (e) ids.push(...e.objetos); }
+  return ids;
+}
+
+function destacar(ids) {
+  estado.vista.capas.objetos.querySelectorAll('.destacado').forEach(n => n.classList.remove('destacado'));
+  for (const id of ids) estado.vista.capas.objetos.querySelector(`.objeto[data-id="${id}"]`)?.classList.add('destacado');
+}
+
+/* ---------- Ejercicio ---------- */
+
+function cargarEjercicio() {
+  estado.ej = generar(estado.tipo, { carta: estado.carta, tablilla: estado.tablilla, anyo: estado.anyo, semilla: estado.semilla });
+  estado.pistas = 0;
+  estado.vista.capas.solucion.replaceChildren();
+  const u = new URL(location); u.searchParams.set('tipo', estado.tipo); u.searchParams.set('semilla', estado.semilla); u.searchParams.set('carta', estado.cartaId);
+  history.replaceState(null, '', u);
+  destacar(objetosDelEjercicio(estado.ej));
+  pintarPanel();
+}
+
+function pintarPanel() {
+  const ej = estado.ej;
+  const ut = UNIDADES.find(u => u.id === 'ut11');
+  $('#cabEyebrow').textContent = `Aprendizaje · UT ${ut.n} · ${ut.titulo} · semilla ${ej.semilla}`;
+  $('#cabTitulo').textContent = ej.titulo;
+  const datos = describirVisibles(ej);
+  $('#panel').innerHTML = `
+    <div class="panel ejercicio">
+      <h3>${ej.titulo}</h3>
+      <p class="enunciado">${ej.enunciado}</p>
+      ${datos.length ? `<div class="datos"><dl>${datos.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></div>` : ''}
+      <div class="campos">
+        ${ej.campos.map(c => `<label>${c.etiqueta}<input type="text" inputmode="${c.tipo === 'hora' ? 'numeric' : 'decimal'}" data-campo="${c.id}" placeholder="${marcador(c)}" autocomplete="off"></label>`).join('')}
+      </div>
+      <div class="acciones">
+        <button class="btn acc" id="comprobar">Comprobar</button>
+        <button class="btn sec" id="pista">Pista</button>
+        <button class="btn sec" id="solucion">Solución</button>
+        <button class="btn sec" id="otro">Otro ejercicio</button>
+      </div>
+      <div class="explica" id="veredicto" hidden></div>
+      <div class="pistas" id="pistas" hidden><ol></ol></div>
+    </div>
+    <details class="panel" style="padding:.8rem 1.1rem">
+      <summary>Cambiar de ejercicio</summary>
+      <div class="barra" style="margin:.6rem 0 0">
+        <select id="selTipo" aria-label="Tipo de ejercicio">
+          ${TIPOS.filter(t => t.cartas.includes(estado.carta.meta.tipo)).map(t => `<option value="${t.id}" ${t.id === ej.tipo ? 'selected' : ''}>${t.titulo}</option>`).join('')}
+        </select>
+        <label class="mono" style="font-size:.85rem">Semilla <input type="number" id="inSemilla" value="${ej.semilla}" min="1" max="999999" style="width:7em"></label>
+        <button class="btn sec" id="irEjercicio">Ir</button>
+      </div>
+    </details>
+    <div class="nota aviso"><b>${estado.carta.meta.sello}</b><p>Costa, sondas y faros son inventados. Sirve para practicar el trazado; no para navegar.</p></div>`;
+
+  $('#comprobar').onclick = comprobar;
+  $('#pista').onclick = () => mostrarPistas(estado.pistas + 1);
+  $('#solucion').onclick = () => mostrarPistas(ej.solucion.length);
+  $('#otro').onclick = () => { estado.semilla = Math.floor(Math.random() * 9000 + 1000); cargarEjercicio(); };
+  $('#irEjercicio').onclick = () => { estado.tipo = $('#selTipo').value; estado.semilla = +$('#inSemilla').value || 1; cargarEjercicio(); };
+  $('#panel').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches('[data-campo]')) comprobar(); });
+}
+
+function marcador(campo) {
+  return ({ coordenada: campo.eje === 'lat' ? "36° 04,3' N" : "012° 36,7' W", angulo: '047', 'angulo-signo': '−2,4', millas: '12,3', hora: '10:20', minutos: '75', metros: '4,2' })[campo.tipo] ?? '';
+}
+
+function leerRespuesta() {
+  const r = {};
+  document.querySelectorAll('[data-campo]').forEach(i => r[i.dataset.campo] = i.value);
+  return r;
+}
+
+function comprobar() {
+  const ej = estado.ej;
+  const r = ej.validar(leerRespuesta());
+  const salida = $('#veredicto');
+  salida.hidden = false;
+  salida.style.borderLeftColor = r.correcto ? 'var(--estribor)' : 'var(--babor)';
+  const filas = r.detalle.map(d => {
+    const campo = ej.campos.find(c => c.id === d.campo);
+    const esperado = formatearValor(campo, d.esperado);
+    return `<li><b>${campo.etiqueta}</b>: ${d.dado === null ? 'sin respuesta o ilegible' : d.dentro ? 'bien' : `fuera de tolerancia (${formatearError(campo, d.error)})`}${!d.dentro ? ` · esperado <span class="mono">${esperado}</span>` : ''}</li>`;
+  }).join('');
+  salida.innerHTML = `${r.correcto ? '<b>Correcto.</b>' : '<b>No es correcto.</b>'}<ul style="margin:.4rem 0 0;padding-left:1.1rem">${filas}</ul>${r.avisos.map(a => `<p style="margin:.5rem 0 0"><b>Aviso:</b> ${AVISOS[a] ?? a}</p>`).join('')}`;
+  if (!r.correcto && estado.pistas === 0) mostrarPistas(1);
+  document.dispatchEvent(new CustomEvent('mesa:comprobado', { detail: { ejercicio: ej, resultado: r } }));
+}
+
+function formatearValor(campo, v) {
+  switch (campo.tipo) {
+    case 'coordenada': return formatearGrados(v, campo.eje);
+    case 'angulo': return formatearAngulo(v);
+    case 'angulo-signo': return `${v < 0 ? '−' : '+'}${Math.abs(v).toFixed(1).replace('.', ',')}°`;
+    case 'hora': { const t = ((Math.round(v) % 1440) + 1440) % 1440; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; }
+    case 'millas': return `${v.toFixed(1).replace('.', ',')} M`;
+    default: return String(Math.round(v * 10) / 10).replace('.', ',');
   }
+}
+function formatearError(campo, e) {
+  return campo.tipo === 'coordenada' ? `${e.toFixed(1).replace('.', ',')}'` : campo.tipo === 'hora' || campo.tipo === 'minutos' ? `${Math.round(e)} min` : campo.tipo === 'millas' ? `${e.toFixed(1).replace('.', ',')} M` : `${e.toFixed(1).replace('.', ',')}°`;
+}
 
-  const svg = $('#carta');
-  const vista = pintarCarta(svg, carta, { anyo });
-  const esFondo = t => !t.closest('.capa-instrumentos, .capa-trazos, .objeto');
-  const zoom = crearZoomPan(svg, vista.mundo, { esFondo });
+function mostrarPistas(n) {
+  const ej = estado.ej;
+  n = Math.min(n, ej.solucion.length);
+  const cont = $('#pistas');
+  cont.hidden = false;
+  const ol = cont.querySelector('ol');
+  for (let i = estado.pistas; i < n; i++) {
+    const li = document.createElement('li'); li.textContent = ej.solucion[i].texto; ol.append(li);
+    if (ej.solucion[i].trazo) dibujarTrazo(estado.vista.capas.solucion, estado.vista.proyeccion, ej.solucion[i].trazo);
+  }
+  estado.pistas = n;
+  if (n >= ej.solucion.length) { $('#pista').disabled = true; $('#solucion').disabled = true; }
+}
 
-  // ficha ENC didáctica al tocar un objeto
+/* ---------- Herramientas ---------- */
+
+function pintarHerramientas() {
+  const h = $('#herramientas');
+  h.innerHTML = `
+    <button class="btn sec" id="btnLecturas" aria-pressed="false" title="Muestra latitud y longitud bajo el cursor">Lecturas</button>
+    <button class="btn sec" id="btnCartaCompleta">Carta completa</button>
+    <span class="sep"></span>
+    <span id="lecturaCursor" class="lectura" aria-live="off"></span>`;
+  $('#btnCartaCompleta').onclick = () => estado.zoom.reiniciar();
+  $('#btnLecturas').onclick = ev => {
+    estado.lecturas = !estado.lecturas;
+    ev.currentTarget.setAttribute('aria-pressed', String(estado.lecturas));
+    if (!estado.lecturas) $('#lecturaCursor').textContent = '';
+  };
+  $('#carta').addEventListener('pointermove', ev => {
+    if (!estado.lecturas) return;
+    const p = estado.zoom.aViewBox(ev);
+    const k = estado.zoom.escala(), t = estado.zoom.traslacion();
+    const [lat, lon] = estado.vista.proyeccion.aGeo((p.x - t.x) / k, (p.y - t.y) / k);
+    $('#lecturaCursor').textContent = fPos([lat, lon]);
+  });
+}
+
+/* ---------- Fichas ---------- */
+
+function activarFichas() {
   const marco = $('#cartaMarco');
-  const abrirFicha = id => {
-    const f = fichaObjeto(carta, id);
+  const abrir = id => {
+    const f = fichaObjeto(estado.carta, id);
     if (!f) return;
     marco.querySelector('.ficha')?.remove();
     const div = document.createElement('div');
@@ -44,23 +224,30 @@ async function iniciar() {
     div.querySelector('button').onclick = () => div.remove();
     marco.append(div);
   };
-  vista.capas.objetos.addEventListener('click', ev => {
+  estado.vista.capas.objetos.addEventListener('click', ev => { const o = ev.target.closest('.objeto'); if (o) abrir(o.dataset.id); });
+  estado.vista.capas.objetos.addEventListener('keydown', ev => {
     const o = ev.target.closest('.objeto');
-    if (o) abrirFicha(o.dataset.id);
+    if (o && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abrir(o.dataset.id); }
   });
-  vista.capas.objetos.addEventListener('keydown', ev => {
-    const o = ev.target.closest('.objeto');
-    if (o && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abrirFicha(o.dataset.id); }
-  });
+}
 
-  $('#cabTitulo').textContent = carta.meta.nombre;
-  $('#panel').innerHTML = `<div class="panel">
-      <h3>${carta.meta.nombre}</h3>
-      <p>${carta.meta.subtitulo}. Escala 1:${carta.meta.escala.toLocaleString('es-ES')}. Rueda o pinza para ampliar, arrastra para desplazar, doble clic para volver.</p>
-      <p style="margin:0"><button class="btn sec" id="reiniciarZoom">Ver carta completa</button></p>
-    </div>
-    <div class="nota aviso"><b>${carta.meta.sello}</b><p>Costa, sondas y faros son inventados. Sirve para practicar el trazado; no para navegar.</p></div>`;
-  $('#reiniciarZoom').onclick = () => zoom.reiniciar();
+/* ---------- Arranque ---------- */
+
+async function iniciar() {
+  try {
+    [estado.carta, estado.tablilla] = await Promise.all([cargarJson(`data/cartas/${estado.cartaId}.json`), cargarJson('data/tablilla-desvios.json')]);
+  } catch {
+    $('#estadoCarga').textContent = 'No se han podido cargar los datos. Arranca el sitio desde un servidor local: node tools/servir.js';
+    return;
+  }
+  const svg = $('#carta');
+  estado.vista = pintarCarta(svg, estado.carta, { anyo: estado.anyo });
+  estado.zoom = crearZoomPan(svg, estado.vista.mundo, { esFondo: t => !t.closest('.capa-instrumentos, .capa-trazos, .objeto') });
+  activarFichas();
+  pintarHerramientas();
+  if (!TIPOS.some(t => t.id === estado.tipo && t.cartas.includes(estado.carta.meta.tipo))) estado.tipo = TIPOS.find(t => t.cartas.includes(estado.carta.meta.tipo)).id;
+  cargarEjercicio();
 }
 
 iniciar();
+export { estado };
