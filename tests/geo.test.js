@@ -30,6 +30,10 @@ test('parsearGrados acepta grados-minutos con hemisferio y decimales con coma', 
   cerca(geo.parsearGrados('36,5 S'), -36.5, 1e-9);
   assert.ok(Number.isNaN(geo.parsearGrados('hola')));
   assert.ok(Number.isNaN(geo.parsearGrados('')));
+  cerca(geo.parsearGrados('+3,5'), 3.5, 1e-9, 'signo más explícito');
+  cerca(geo.parsearGrados('−2,4'), -2.4, 1e-9, 'menos tipográfico U+2212');
+  cerca(geo.parsearGrados('–2,4'), -2.4, 1e-9, 'guion corto');
+  assert.ok(Number.isNaN(geo.parsearGrados("36° 65' N")), 'minutos fuera de rango');
 });
 
 test('formatearGrados produce el formato de carta y recorre ida y vuelta', () => {
@@ -141,6 +145,14 @@ test('alturaMarea: c11 del taller (09:00 entre BM 06:00 0,5 y PM 12:00 3,5 → 2
   cerca(geo.alturaMarea('07:00', bm, pm), 0.75, 0.01, 'primer doceavo');
   cerca(geo.alturaMarea('06:00', bm, pm), 0.5, 1e-9);
   cerca(geo.alturaMarea('12:00', bm, pm), 3.5, 1e-9);
+});
+
+test('alturaMarea y eventosAlrededor cruzan la medianoche', () => {
+  const bm = ['BM', '22:00', 0.5], pm = ['PM', '04:12', 3.5];
+  cerca(geo.alturaMarea('01:06', bm, pm), 2.0, 0.02, 'mitad del tramo nocturno');
+  cerca(geo.alturaMarea('23:00', bm, pm), 0.5 + 3 / 12, 0.02);
+  const h = geo.horaParaAltura(2.0, bm, pm);
+  cerca(h, geo.parsearHora('01:06'), 3);
 });
 
 test('horaParaAltura: c12 (1,9 m) cae antes de las 09:00 y es inversa de alturaMarea', () => {

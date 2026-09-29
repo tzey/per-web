@@ -32,7 +32,7 @@ export function formatearAngulo(grados) {
 /** Acepta «36° 12,5' N», «36 12.5 N», «012° 36,7' W», «5° 30' O», «-12,3». */
 export function parsearGrados(texto) {
   if (texto === null || texto === undefined) return NaN;
-  const t = String(texto).trim().toUpperCase().replace(/,/g, '.');
+  const t = String(texto).trim().toUpperCase().replace(/,/g, '.').replace(/[−–]/g, '-').replace(/^\+/, '');
   if (!t) return NaN;
   const hemi = t.match(/[NSEWO]$/);
   const cuerpo = hemi ? t.slice(0, -1) : t;
@@ -40,6 +40,7 @@ export function parsearGrados(texto) {
   const numeros = cuerpo.replace(/[°'"′″]/g, ' ').replace(/-/g, ' ').trim().split(/\s+/).filter(Boolean);
   if (!numeros.length || numeros.length > 3 || numeros.some(n => !/^\d+(\.\d+)?$/.test(n))) return NaN;
   const [g, m = 0, s = 0] = numeros.map(Number);
+  if (m >= 60 || s >= 60) return NaN;
   let valor = g + m / 60 + s / 3600;
   if (negativo) valor = -valor;
   if (hemi && /[SWO]/.test(hemi[0])) valor = -Math.abs(valor);

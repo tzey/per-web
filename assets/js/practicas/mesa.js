@@ -14,12 +14,18 @@ pintarRail('mesa.html');
 
 const $ = s => document.querySelector(s);
 const params = new URLSearchParams(location.search);
+/** Parámetro numérico de la URL saneado: entero dentro de [min, max] o el valor por defecto. */
+function paramNum(nombre, defecto, min, max) {
+  const v = Number(params.get(nombre));
+  if (!params.has(nombre) || !Number.isFinite(v)) return defecto;
+  return Math.max(min, Math.min(max, Math.round(v)));
+}
 const estado = {
-  cartaId: params.get('carta') ?? 'estrecho-didactico',
+  cartaId: /^[a-z0-9-]+$/.test(params.get('carta') ?? '') ? params.get('carta') : 'estrecho-didactico',
   tipo: params.get('tipo') ?? 'situacion-dos-demoras',
-  semilla: +(params.get('semilla') ?? Math.floor(Math.random() * 9000 + 1000)),
-  modo: params.get('modo') ?? 'aprendizaje',
-  anyo: +(params.get('anyo') ?? new Date().getFullYear()),
+  semilla: paramNum('semilla', Math.floor(Math.random() * 9000 + 1000), 1, 999999),
+  modo: params.get('modo') === 'examen' ? 'examen' : 'aprendizaje',
+  anyo: paramNum('anyo', new Date().getFullYear(), 2000, 2100),
   carta: null, tablilla: null, mareas: null, marea: null, vista: null, zoom: null, ej: null, pistas: 0, lecturas: false,
   compas: null, transportador: null, lapiz: null, sesion: null,
   opciones: { viento: null, corriente: null }, errores: { desvioExtra: 0 }
@@ -49,6 +55,7 @@ function describirVisibles(ej) {
   const v = ej.visibles, filas = [];
   if (v.hora) filas.push(['Hora', v.hora]);
   if (v.desde) filas.push(['Situación de partida', fPos(v.desde)]);
+  if (v.encadenado) filas.push(['Situación de partida', 'la del ejercicio anterior']);
   if (v.objeto) filas.push(['Objeto', nombreDe(v.objeto)]);
   if (v.enfilacion) filas.push(['Enfilación', nombreDe(v.enfilacion)]);
   if (v.peligro) filas.push(['Peligro', nombreDe(v.peligro)]);
@@ -94,7 +101,12 @@ function destacar(ids) {
 /* ---------- Ejercicio ---------- */
 
 function cargarEjercicio() {
-  estado.ej = generar(estado.tipo, { carta: estado.carta, tablilla: estado.tablilla, mareas: estado.mareas, anyo: estado.anyo, semilla: estado.semilla, opciones: estado.opciones });
+  try {
+    estado.ej = generar(estado.tipo, { carta: estado.carta, tablilla: estado.tablilla, mareas: estado.mareas, anyo: estado.anyo, semilla: estado.semilla, opciones: estado.opciones });
+  } catch (err) {
+    panelError(`No se ha podido generar el ejercicio «${estado.tipo}» con la semilla ${estado.semilla}.`, err, () => { estado.semilla = Math.floor(Math.random() * 9000 + 1000); cargarEjercicio(); });
+    return;
+  }
   estado.marea = null;
   estado.pistas = 0;
   estado.vista.capas.solucion.replaceChildren();
@@ -162,6 +174,7 @@ function pintarPanel() {
         <button class="btn sec" id="irEjercicio">Ir</button>
       </div>
     </details>
+    ${htmlTablilla()}
     <div class="nota aviso"><b>${estado.carta.meta.sello}</b><p>Costa, sondas y faros son inventados. Sirve para practicar el trazado; no para navegar.</p></div>`;
 
   $('#comprobar').onclick = comprobar;
@@ -179,8 +192,29 @@ function pintarPanel() {
     estado.errores = { desvioExtra: num('#desvioExtra') ?? 0 };
     cargarEjercicio();
   };
-  $('#panel').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches('[data-campo]')) comprobar(); });
   if (ej.visibles.eventos) activarMarea(ej);
+}
+
+/** Tablilla de desvíos plegable; en el examen real se entrega, así que se muestra también en el simulacro. */
+function htmlTablilla() {
+  const t = estado.tablilla;
+  if (!t) return '';
+  const mitad = Math.ceil(t.filas.length / 2);
+  const fila = f => `<tr><td class="num">${String(f.ra).padStart(3, '0')}°</td><td class="num">${f.desvio < 0 ? '−' : '+'}${Math.abs(f.desvio).toFixed(1).replace('.', ',')}°</td></tr>`;
+  return `<details class="panel" style="padding:.8rem 1.1rem" id="panelTablilla">
+    <summary>Tablilla de desvíos</summary>
+    <p style="font-size:.85rem;color:var(--tinta-70);margin:.5rem 0">${t.compas}, ${t.fecha}. Desvío por rumbo de aguja, este positivo. Interpola entre filas.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1rem">
+      <table style="margin:0"><thead><tr><th>Ra</th><th>Δ</th></tr></thead><tbody>${t.filas.slice(0, mitad).map(fila).join('')}</tbody></table>
+      <table style="margin:0"><thead><tr><th>Ra</th><th>Δ</th></tr></thead><tbody>${t.filas.slice(mitad).map(fila).join('')}</tbody></table>
+    </div>
+  </details>`;
+}
+
+function panelError(mensaje, err, reintentar) {
+  console.error(err);
+  $('#panel').innerHTML = `<div class="nota aviso"><b>No se ha podido preparar la mesa</b><p>${mensaje}</p><p style="margin:.6rem 0 0"><button class="btn acc" id="reintentar">Probar con otra semilla</button> <a class="btn sec" href="practicas.html">Volver a prácticas</a></p></div>`;
+  $('#reintentar').onclick = reintentar;
 }
 
 /* ---------- Marea en vivo ---------- */
@@ -414,6 +448,7 @@ async function iniciar() {
   estado.zoom = crearZoomPan(svg, estado.vista.mundo, { esFondo: t => !estado.lapiz?.modo() && !t.closest('.capa-instrumentos, .capa-trazos, .objeto') });
   activarFichas();
   pintarHerramientas();
+  $('#panel').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches('[data-campo]') && estado.modo === 'aprendizaje') comprobar(); });
   if (estado.modo === 'examen') { iniciarExamen(); return; }
   if (!TIPOS.some(t => t.id === estado.tipo && t.cartas.includes(estado.carta.meta.tipo))) estado.tipo = TIPOS.find(t => t.cartas.includes(estado.carta.meta.tipo)).id;
   cargarEjercicio();
@@ -424,8 +459,13 @@ async function iniciar() {
 const examen = { ejercicios: [], respuestas: {}, timer: null, restante: 0, entregado: false };
 
 function iniciarExamen() {
-  const minutos = Math.max(5, Math.min(90, +(params.get('minutos') ?? 20)));
-  examen.ejercicios = generarSimulacro({ carta: estado.carta, tablilla: estado.tablilla, anyo: estado.anyo, semilla: estado.semilla });
+  const minutos = paramNum('minutos', 20, 5, 90);
+  try {
+    examen.ejercicios = generarSimulacro({ carta: estado.carta, tablilla: estado.tablilla, anyo: estado.anyo, semilla: estado.semilla });
+  } catch (err) {
+    panelError(`No se ha podido generar el simulacro con la semilla ${estado.semilla}.`, err, () => { location.href = `mesa.html?modo=examen&semilla=${Math.floor(Math.random() * 9000 + 1000)}&minutos=${minutos}`; });
+    return;
+  }
   estado.sesion = crearSesion({ modo: 'examen', cartaId: estado.cartaId, versionCarta: estado.carta.version,
     ejercicios: examen.ejercicios.map(e => ({ id: e.id, tipo: e.tipo, semilla: e.semilla })) });
   // sin ayudas: lecturas, pistas y condiciones fuera
@@ -452,6 +492,7 @@ function iniciarExamen() {
           ${ej.campos.map(c => `<label>${c.etiqueta}<input type="text" inputmode="${c.tipo === 'hora' ? 'numeric' : 'decimal'}" data-ej-campo="${ej.id}" data-campo="${c.id}" placeholder="${marcador(c)}" autocomplete="off"></label>`).join('')}
         </div>
       </div>`).join('')}
+    ${htmlTablilla()}
     <div class="barra"><button class="btn acc" id="entregar">Entregar</button><a class="btn sec" href="practicas.html">Salir sin entregar</a></div>
     <div id="resultadoExamen"></div>`;
   $('#entregar').onclick = () => entregarExamen(false);

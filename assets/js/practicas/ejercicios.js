@@ -150,6 +150,11 @@ function objetosVisibles(c, P, colecciones = ['faros', 'marcas', 'boyas']) {
 
 const nombre = o => o.nombre ?? o.id;
 
+/** Texto y datos visibles del punto de partida: si viene fijado por el ejercicio anterior, no se revela. */
+const origen = (c, P) => c.fijar.desde
+  ? { texto: 'la situación obtenida en el ejercicio anterior', visibles: { encadenado: true } }
+  : { texto: fPos(P), visibles: { desde: P } };
+
 /** Ra tal que Rv = Ra + dm + desvío(Ra), iterando sobre la tablilla. */
 function ajustarAguja(rv, dm, tablilla) {
   let ra = normalizar(rv - dm), desvio = 0;
@@ -256,15 +261,17 @@ const distanciaSegmentoM = (p, a, b) => {
 };
 
 /** Qué toca un círculo de borneo de `radioM` metros centrado en p. */
-function conflictosBorneo(carta, p, radioM) {
+export function conflictosBorneo(carta, p, radioM) {
   const salida = [];
   const radioMillas = radioM / MILLA_M;
   for (let a = 0; a < 360; a += 15) if (enTierra(carta, puntoDesde(p, a, radioMillas))) { salida.push('tierra'); break; }
   for (const z of carta.zonas) {
     if (z.tipo === 'fondeadero') continue;
     const puntos = z.linea ?? z.poligono;
+    const cerrado = !z.linea && (puntos[0][0] !== puntos[puntos.length - 1][0] || puntos[0][1] !== puntos[puntos.length - 1][1]);
+    const lados = puntos.length - (cerrado ? 0 : 1);
     let toca = false;
-    for (let i = 0; i < puntos.length - 1; i++) if (distanciaSegmentoM(p, puntos[i], puntos[i + 1]) <= radioM) toca = true;
+    for (let i = 0; i < lados; i++) if (distanciaSegmentoM(p, puntos[i], puntos[(i + 1) % puntos.length]) <= radioM) toca = true;
     if (z.poligono && dentroDePoligono(p, z.poligono)) toca = true;
     if (toca) salida.push(z.etiqueta ?? z.tipo);
   }
@@ -291,19 +298,19 @@ const GENERADORES = {
     const factor = elegir(prng, [3, 4, 5]);
     const cadena = Math.ceil(factor * profundidadPM / 5) * 5;
     const calado = elegir(prng, [1.2, 1.5, 1.8, 2.0]);
-    const radio = radioBorneo(eslora, cadena, profundidadPM);
+    const radio = radioBorneo(eslora, cadena, profundidadBM);   // el mayor: con menos agua, más cadena tendida
     const resguardoBM = Math.round((profundidadBM - calado) * 100) / 100;
     if (resguardoBM < -3) return { real: { degenerado: 'sin-agua' } };
     const conflictos = conflictosBorneo(c.carta, P, radio);
     return {
-      enunciado: `Fondeas en ${fPos(P)}, dentro del fondeadero, sobre una sonda de carta de ${fM_(sonda)}. Barco de ${eslora} m de eslora y ${fM_(calado)} de calado; largas ${cadena} m de cadena. Anuario de ${d.nombre}, ${fFecha(d.fecha)}: ${d.eventos.map(e => `${e[0]} ${e[1]} ${fM_(e[2])}`).join(', ')}. Halla el radio de borneo en pleamar, la profundidad en la bajamar y el resguardo bajo la quilla en ese momento.`,
+      enunciado: `Fondeas en ${fPos(P)}, dentro del fondeadero, sobre una sonda de carta de ${fM_(sonda)}. Barco de ${eslora} m de eslora y ${fM_(calado)} de calado; largas ${cadena} m de cadena. Anuario de ${d.nombre}, ${fFecha(d.fecha)}: ${d.eventos.map(e => `${e[0]} ${e[1]} ${fM_(e[2])}`).join(', ')}. Halla el radio de borneo máximo, que se da en la bajamar, la profundidad en ese momento y el resguardo bajo la quilla.`,
       visibles: { situacion: P, puerto: d.puertoId, fecha: d.fecha, eventos: d.eventos, sondaCarta: sonda, sondaPos: P, eslora, cadena, calado },
       real: { situacion: P, sonda, profundidadPM, profundidadBM, radio, conflictos, alerta: explicarResguardo({ sondaCarta: sonda, alturaMarea: bm, calado, margen: 0.5 }), respuesta: { radio, profundidadBM, resguardoBM } },
       solucion: [
         { texto: `Sitúa el fondeo en ${fPos(P)}.`, trazo: { tipo: 'punto', pos: P, simbolo: 'marca', etiqueta: 'ancla' } },
-        { texto: `Profundidad en pleamar: ${fM_(sonda)} + ${fM_(pm)} = ${fM_(profundidadPM)}. El radio de borneo se calcula con la mayor profundidad, porque la cadena tendida es entonces menor.` },
-        { texto: `Radio = √(cadena² − profundidad²) + eslora = √(${cadena}² − ${fNum(profundidadPM)}²) + ${eslora} = ${fNum(radio, 0)} m.`, valor: radio, trazo: { tipo: 'circulo', centro: P, radioM: radio / MILLA_M } },
-        { texto: `Profundidad en bajamar: ${fM_(sonda)} + ${fM_(bm)} = ${fM_(profundidadBM)}. Resguardo = ${fM_(profundidadBM)} − ${fM_(calado)} = ${fM_(resguardoBM)}${resguardoBM < 0.5 ? ': insuficiente, busca más fondo o espera' : ''}.`, valor: resguardoBM },
+        { texto: `La cadena se dimensiona con la pleamar (${fM_(sonda)} + ${fM_(pm)} = ${fM_(profundidadPM)}, ${cadena} m largados). El borneo se comprueba con la bajamar, cuando queda más cadena tendida sobre el fondo y el círculo es mayor.` },
+        { texto: `Profundidad en bajamar: ${fM_(sonda)} + ${fM_(bm)} = ${fM_(profundidadBM)}. Radio = √(cadena² − profundidad²) + eslora = √(${cadena}² − ${fNum(profundidadBM)}²) + ${eslora} = ${fNum(radio, 0)} m.`, valor: radio, trazo: { tipo: 'circulo', centro: P, radioM: radio / MILLA_M } },
+        { texto: `Resguardo en bajamar = ${fM_(profundidadBM)} − ${fM_(calado)} = ${fM_(resguardoBM)}${resguardoBM < 0.5 ? ': insuficiente, busca más fondo o espera' : ''}.`, valor: resguardoBM },
         { texto: conflictos.length ? `El círculo de borneo alcanza: ${conflictos.join(', ')}. Cambia de punto o acorta cadena.` : 'El círculo de borneo no toca cable, bañistas, boyas ni tierra.' }
       ],
       campos: [{ id: 'radio', etiqueta: 'Radio de borneo (m)', tipo: 'metrosLargo' }, { id: 'profundidadBM', etiqueta: 'Profundidad en bajamar (m)', tipo: 'metros' }, { id: 'resguardoBM', etiqueta: 'Resguardo en bajamar (m)', tipo: 'metros' }]
@@ -356,7 +363,7 @@ const GENERADORES = {
     const ant = d.eventos[i], des = d.eventos[i + 1];
     const t0 = parsearHora(ant[1]), t1 = parsearHora(des[1]);
     if (t1 - t0 < 60) return { real: { degenerado: 'tramo-corto' } };
-    const hora = redondear(t0 + 15 + prng() * (t1 - t0 - 30), 5);
+    const hora = Math.round(t0 + entero(prng, 1, 5) * (t1 - t0) / 6);   // en un límite de sexto: doceavos enteros
     const altura = alturaMarea(hora, ant, des);
     return {
       enunciado: `Anuario de ${d.nombre}, ${fFecha(d.fecha)}: ${d.eventos.map(e => `${e[0]} ${e[1]} ${fM_(e[2])}`).join(', ')}. ¿Qué altura de marea hay a las ${formatearHora(hora)}? Usa la regla de los doceavos.`,
@@ -376,7 +383,7 @@ const GENERADORES = {
     const ant = d.eventos[i], des = d.eventos[i + 1];
     const t0 = parsearHora(ant[1]), t1 = parsearHora(des[1]);
     if (t1 - t0 < 60) return { real: { degenerado: 'tramo-corto' } };
-    const hora = redondear(t0 + 15 + prng() * (t1 - t0 - 30), 5);
+    const hora = Math.round(t0 + entero(prng, 1, 5) * (t1 - t0) / 6);   // en un límite de sexto: doceavos enteros
     const altura = Math.round(alturaMarea(hora, ant, des) * 100) / 100;
     const bm = Math.min(...d.eventos.map(e => e[2])), pm = Math.max(...d.eventos.map(e => e[2]));
     const combinaciones = [];
@@ -518,9 +525,10 @@ const GENERADORES = {
     const hora = c.fijar.hora ?? entero(prng, 6, 18) * 60 + elegir(prng, [0, 10, 15, 20, 30, 40, 45, 50]);
     const minutos = tiempoParaDistancia(distancia, velocidad);
     const eta = hora + minutos;
+    const org = origen(c, P);
     return {
-      enunciado: `A las ${formatearHora(hora)} estás en ${fPos(P)} y pones proa a ${nombre(o)} a ${fNum(velocidad)} nudos. Mide la distancia en la carta y calcula la hora de llegada.`,
-      visibles: { desde: P, hora: formatearHora(hora), objeto: o.id, velocidad },
+      enunciado: `A las ${formatearHora(hora)} estás en ${org.texto} y pones proa a ${nombre(o)} a ${fNum(velocidad)} nudos. Mide la distancia en la carta y calcula la hora de llegada.`,
+      visibles: { ...org.visibles, hora: formatearHora(hora), objeto: o.id, velocidad },
       real: { desde: P, objeto: o.id, rumbo, distancia, minutos, horaLlegada: Math.round(eta), respuesta: { distancia, eta } },
       solucion: [
         { texto: `Une ${fPos(P)} con ${nombre(o)}.`, trazo: { tipo: 'recta', desde: P, rumbo, largoM: distancia } },
@@ -540,9 +548,10 @@ const GENERADORES = {
     const o = elegir(prng, vis);
     const { rumbo: rv, distancia } = rumboDistancia(P, o.pos);
     const { ra, desvio, ct } = ajustarAguja(rv, c.dm, c.tablilla);
+    const org = origen(c, P);
     return {
-      enunciado: `Estás en ${fPos(P)} y quieres poner proa a ${nombre(o)}. Halla el rumbo verdadero a trazar y el rumbo de aguja que debes gobernar, con la declinación de la rosa actualizada a ${c.anyo} y el desvío de la tablilla.`,
-      visibles: { desde: P, objeto: o.id, anyo: c.anyo, usaTablilla: true },
+      enunciado: `Estás en ${org.texto} y quieres poner proa a ${nombre(o)}. Halla el rumbo verdadero a trazar y el rumbo de aguja que debes gobernar, con la declinación de la rosa actualizada a ${c.anyo} y el desvío de la tablilla.`,
+      visibles: { ...org.visibles, objeto: o.id, anyo: c.anyo, usaTablilla: true },
       real: { desde: P, objeto: o.id, rv, distancia, dm: c.dm, desvio, ct, ra,
         trampas: { ra: [{ valor: normalizar(rv + ct), aviso: 'signo-ct' }, { valor: normalizar(rv - c.dm), aviso: 'sin-desvio' }] },
         respuesta: { rv, ra } },
@@ -599,12 +608,14 @@ const GENERADORES = {
       { texto: `D = V × t = ${fNum(velocidad)} × ${fNum(minutos / 60, 2)} h = ${fM(distancia)}. Tómala en la escala de latitudes y llévala sobre el rumbo.`, valor: distancia },
       { texto: `Situación de estima a las ${formatearHora(hora + minutos)}: ${fPos(estimaPura)}. Anótala con el símbolo de estima, no con el de observada.`, trazo: { tipo: 'punto', pos: estimaPura, simbolo: 'estima', etiqueta: formatearHora(hora + minutos) } }
     ];
-    if (viento?.abatimiento) pasos.push({ texto: `Con abatimiento de ${viento.abatimiento}° por ${viento.banda}, el rumbo efectivo es ${fAng(rumboEfectivo)}.` });
+    if (viento?.abatimiento) pasos.push({ texto: `Con abatimiento de ${viento.abatimiento}° hacia ${viento.banda}, el rumbo efectivo es ${fAng(rumboEfectivo)}.` });
     if (corriente?.intensidad) pasos.push({ texto: `La corriente de ${fNum(corriente.intensidad)} nudos al ${fAng(corriente.rumbo)} desplaza la estima ${fM(corriente.intensidad * minutos / 60)} en esa dirección: situación con deriva ${fPos(llegada)}. Esto no aparece en el examen de UT11.`, trazo: { tipo: 'recta', desde: estimaPura, rumbo: corriente.rumbo, largoM: corriente.intensidad * minutos / 60 } });
+    const org = origen(c, P);
+    const rvTexto = c.fijar.rv !== undefined ? 'al rumbo verdadero hallado en el ejercicio anterior' : `al rumbo verdadero ${fAng(rv)}`;
     return {
-      enunciado: `A las ${formatearHora(hora)} estás en ${fPos(P)} y navegas al rumbo verdadero ${fAng(rv)} a ${fNum(velocidad)} nudos${corriente?.intensidad ? `, con corriente de ${fNum(corriente.intensidad)} nudos al ${fAng(corriente.rumbo)}` : ''}${viento?.abatimiento ? ` y abatimiento de ${viento.abatimiento}° por ${viento.banda}` : ''}. Halla la situación de estima a las ${formatearHora(hora + minutos)}.`,
-      visibles: { desde: P, hora: formatearHora(hora), rv, velocidad, minutos, corriente: corriente ?? null, viento: viento ?? null },
-      real: { desde: P, llegada, estimaPura, rv, distancia, horaLlegada: hora + minutos, respuesta: { lat: llegada[0], lon: llegada[1] } },
+      enunciado: `A las ${formatearHora(hora)} estás en ${org.texto} y navegas ${rvTexto} a ${fNum(velocidad)} nudos${corriente?.intensidad ? `, con corriente de ${fNum(corriente.intensidad)} nudos al ${fAng(corriente.rumbo)}` : ''}${viento?.abatimiento ? ` y abatimiento de ${viento.abatimiento}° hacia ${viento.banda}` : ''}. Halla la situación de estima a las ${formatearHora(hora + minutos)}.`,
+      visibles: { ...org.visibles, hora: formatearHora(hora), ...(c.fijar.rv !== undefined ? {} : { rv }), velocidad, minutos, corriente: corriente ?? null, viento: viento ?? null },
+      real: { desde: P, llegada, estimaPura, rv, rumboEfectivo, distancia, horaLlegada: hora + minutos, respuesta: { lat: llegada[0], lon: llegada[1] } },
       solucion: pasos,
       campos: [{ id: 'lat', etiqueta: 'Latitud', tipo: 'coordenada', eje: 'lat' }, { id: 'lon', etiqueta: 'Longitud', tipo: 'coordenada', eje: 'lon' }]
     };
@@ -713,9 +724,10 @@ const GENERADORES = {
     const rv = normalizar(rumbo + (lado === 'estribor' ? -ang : ang));   // peligro por estribor → derrota a la izquierda
     const T = puntoDesde(P, rv, Math.sqrt(distancia ** 2 - resguardo ** 2));
     if (!esAgua(c.carta, T, 0.2)) return { real: { degenerado: 'en-tierra' } };
+    const org = origen(c, P);
     return {
-      enunciado: `Estás en ${fPos(P)}. Quieres pasar dejando ${nombre(pel)} a ${fM(resguardo)} por ${lado}. ¿Qué rumbo verdadero debes trazar?`,
-      visibles: { desde: P, peligro: pel.id, resguardo, lado },
+      enunciado: `Estás en ${org.texto}. Quieres pasar dejando ${nombre(pel)} a ${fM(resguardo)} por ${lado}. ¿Qué rumbo verdadero debes trazar?`,
+      visibles: { ...org.visibles, peligro: pel.id, resguardo, lado },
       real: { desde: P, peligro: pel.id, rv, distanciaPeligro: distancia, respuesta: { rv },
         trampas: { rv: [{ valor: normalizar(rumbo + (lado === 'estribor' ? ang : -ang)), aviso: 'lado-contrario' }, { valor: rumbo, aviso: 'sin-resguardo' }] } },
       solucion: [
@@ -736,7 +748,7 @@ function interpretar(campo, valor) {
   if (!t) return NaN;
   if (campo.tipo === 'hora') return parsearHora(t);
   if (campo.tipo === 'coordenada' || campo.tipo === 'angulo-signo') return parsearGrados(t);
-  const n = Number(t.replace(',', '.').replace(/[°'"M\s]/g, ''));
+  const n = Number(t.replace(/[−–]/g, '-').replace(',', '.').replace(/[°'"′″\s]/g, '').replace(/(m|min|nudos|kn|M)$/i, ''));
   return Number.isFinite(n) ? n : NaN;
 }
 
@@ -826,13 +838,21 @@ export function generar(tipo, ctx) {
 
 /** Cuatro ejercicios encadenados sobre la carta costera, sin viento ni corriente. */
 export function generarSimulacro({ carta, tablilla, anyo, semilla }) {
-  const base = { carta, tablilla, anyo, semilla, opciones: { viento: null, corriente: null } };
-  const e1 = generar('situacion-dos-demoras', base);
-  const P = e1.real.situacion, hora = e1.real.hora;
-  const e2 = generar('rumbo-verdadero-aguja', { ...base, fijar: { desde: P } });
-  const e3 = generar('estima', { ...base, fijar: { desde: P, hora, rv: e2.real.rv } });
-  const e4 = generar('distancia-tiempo-eta', { ...base, fijar: { desde: e3.real.llegada, hora: e3.real.horaLlegada } });
-  return [e1, e2, e3, e4].map((e, i) => ({ ...e, id: `simulacro:${semilla}:${i + 1}`, orden: i + 1, validar: r => validar(e, r) }));
+  const base = { carta, tablilla, anyo, opciones: { viento: null, corriente: null } };
+  const raiz = hash(`simulacro:${semilla}`);
+  let ultimo = null;
+  for (let intento = 0; intento < 40; intento++) {
+    const sem = i => (raiz + intento * 104729 + i * 7919) >>> 0;
+    try {
+      const e1 = generar('situacion-dos-demoras', { ...base, semilla: sem(1) });
+      const P = e1.real.situacion, hora = e1.real.hora;
+      const e2 = generar('rumbo-verdadero-aguja', { ...base, semilla: sem(2), fijar: { desde: P } });
+      const e3 = generar('estima', { ...base, semilla: sem(3), fijar: { desde: P, hora, rv: e2.real.rv } });
+      const e4 = generar('distancia-tiempo-eta', { ...base, semilla: sem(4), fijar: { desde: e3.real.llegada, hora: e3.real.horaLlegada } });
+      return [e1, e2, e3, e4].map((e, i) => ({ ...e, id: `simulacro:${semilla}:${i + 1}`, semillaSimulacro: semilla, orden: i + 1, validar: r => validar(e, r) }));
+    } catch (err) { ultimo = err; }
+  }
+  throw new Error(`No se ha podido generar el simulacro ${semilla}: ${ultimo?.message}`);
 }
 
 export function puntuar(ejercicios, respuestas = {}) {

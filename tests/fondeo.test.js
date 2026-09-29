@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { generar, esDegenerado, TIPOS, TOLERANCIAS } from '../assets/js/practicas/ejercicios.js';
+import { generar, esDegenerado, TIPOS, TOLERANCIAS, conflictosBorneo } from '../assets/js/practicas/ejercicios.js';
 import { radioBorneo, dentroDePoligono } from '../assets/js/practicas/geo.js';
 import { enTierra } from '../assets/js/practicas/carta.js';
 
@@ -59,11 +59,13 @@ test('1000 semillas de fondeo sobre el portulano: nunca degenerado, tolerancias 
   }
 });
 
-test('fondeo-borneo-bajamar: el radio sale de eslora, cadena y profundidad en pleamar; la bajamar da el resguardo mínimo', { skip: !puerto }, () => {
+test('fondeo-borneo-bajamar: el radio máximo sale de la profundidad en bajamar; la bajamar da también el resguardo mínimo', { skip: !puerto }, () => {
   for (let s = 1; s <= 50; s++) {
     const ej = generar('fondeo-borneo-bajamar', ctx(s));
     const v = ej.visibles, r = ej.real;
-    assert.ok(Math.abs(r.respuesta.radio - radioBorneo(v.eslora, v.cadena, r.profundidadPM)) < 1e-9);
+    assert.ok(Math.abs(r.respuesta.radio - radioBorneo(v.eslora, v.cadena, r.profundidadBM)) < 1e-9, 'radio con la menor profundidad');
+    assert.ok(r.respuesta.radio >= radioBorneo(v.eslora, v.cadena, r.profundidadPM));
+    assert.match(ej.enunciado, /bajamar/);
     assert.ok(r.profundidadBM < r.profundidadPM);
     assert.ok(Math.abs(r.respuesta.resguardoBM - (r.profundidadBM - v.calado)) < 1e-9);
     assert.ok(Array.isArray(r.conflictos), 'informa de los conflictos del círculo de borneo');
@@ -84,4 +86,13 @@ test('fondeo-garreo: las demoras de control detectan el desplazamiento y la dist
     else assert.ok(r.respuesta.desplazamiento <= 15);
   }
   assert.ok(garrea > 20 && garrea < 80, `mezcla de casos: ${garrea}/100 garrean`);
+});
+
+test('conflictosBorneo cierra el polígono aunque no repita el primer vértice', { skip: !puerto }, () => {
+  const p = [36.15, -12.816];
+  // cuadrado abierto: el lado de cierre ([36.148,-12.818] → [36.152,-12.818]) es el este, a ~180 m del punto
+  const zona = { id: 'z', tipo: 'banistas', etiqueta: 'prueba', poligono: [[36.152, -12.818], [36.152, -12.83], [36.148, -12.83], [36.148, -12.818]] };
+  const carta = { ...puerto, zonas: [zona], boyas: [] };
+  assert.ok(conflictosBorneo(carta, p, 200).includes('prueba'));
+  assert.ok(!conflictosBorneo(carta, p, 100).includes('prueba'));
 });

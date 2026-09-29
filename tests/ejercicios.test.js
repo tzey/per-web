@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { crearPrng, TIPOS, TOLERANCIAS, generar, generarSimulacro, esDegenerado, puntuar, VERSION_GENERADORES } from '../assets/js/practicas/ejercicios.js';
-import { demoraVerdadera, rumboDistancia, reciproco, diferenciaAngular, normalizar } from '../assets/js/practicas/geo.js';
+import { demoraVerdadera, rumboDistancia, reciproco, diferenciaAngular, normalizar, formatearAngulo, formatearGrados as geoFormatear } from '../assets/js/practicas/geo.js';
 import { enTierra, buscarObjeto } from '../assets/js/practicas/carta.js';
 
 const leer = f => JSON.parse(readFileSync(new URL(f, import.meta.url), 'utf8'));
@@ -76,7 +76,7 @@ test('validar acepta la respuesta real y rechaza un error de dos tolerancias', (
       const paso = c.tipo === 'coordenada' ? 2 * (c.eje === 'lat' ? tol.minutosLat : tol.minutosLon) / 60
         : c.tipo === 'angulo' || c.tipo === 'angulo-signo' ? 2 * tol.grados
         : c.tipo === 'millas' ? 2 * tol.millas : c.tipo === 'hora' || c.tipo === 'minutos' ? 2 * tol.minutosTiempo : 2 * tol.metros;
-      mal[c.id] = c.tipo === 'hora' ? (v + paso) : v + paso;
+      mal[c.id] = v + paso;
     }
     assert.equal(ej.validar(mal).correcto, false, `${t} ${s}`);
   }
@@ -148,14 +148,50 @@ test('derrota-resguardo-peligro: la derrota pasa a la distancia pedida del pelig
   }
 });
 
-test('generarSimulacro: cuatro ejercicios encadenados sin viento ni corriente', () => {
+test('generarSimulacro: cuatro ejercicios encadenados sin viento ni corriente y sin filtrar respuestas', () => {
   const sim = generarSimulacro({ carta, tablilla, anyo: 2026, semilla: 2026 });
   assert.equal(sim.length, 4);
   for (const e of sim) { assert.equal(e.opciones.viento, null); assert.equal(e.opciones.corriente, null); assert.equal(esDegenerado(e, carta), null); }
-  assert.deepEqual(sim[1].visibles.desde, sim[0].real.situacion, 'el 2.º parte de la situación del 1.º');
-  assert.deepEqual(sim[2].visibles.desde, sim[0].real.situacion);
-  assert.deepEqual(sim[3].visibles.desde, sim[2].real.llegada, 'el 4.º parte de la estima del 3.º');
+  // el encadenado vive en real, no en visibles ni en el texto
+  assert.deepEqual(sim[1].real.desde, sim[0].real.situacion, 'el 2.º parte de la situación del 1.º');
+  assert.deepEqual(sim[2].real.desde, sim[0].real.situacion);
+  assert.deepEqual(sim[3].real.desde, sim[2].real.llegada, 'el 4.º parte de la estima del 3.º');
+  for (const e of sim.slice(1)) {
+    assert.equal(e.visibles.desde, undefined, `${e.tipo}: visibles.desde filtra la respuesta anterior`);
+    assert.equal(e.visibles.encadenado, true);
+  }
+  const fPosTxt = p => `${geoFormatear(p[0], 'lat')} · ${geoFormatear(p[1], 'lon')}`;
+  assert.ok(!sim[1].enunciado.includes(fPosTxt(sim[0].real.situacion)), 'el enunciado 2 no imprime la situación del 1');
+  assert.ok(!sim[2].enunciado.includes(fPosTxt(sim[0].real.situacion)));
+  assert.equal(sim[2].visibles.rv, undefined, 'el 3.º no imprime el Rv que pide el 2.º');
+  assert.ok(!sim[2].enunciado.includes(formatearAngulo(sim[1].real.rv)));
+  assert.ok(!sim[3].enunciado.includes(fPosTxt(sim[2].real.llegada)));
   assert.deepEqual(serializable(sim), serializable(generarSimulacro({ carta, tablilla, anyo: 2026, semilla: 2026 })));
+});
+
+test('generarSimulacro nunca lanza en 1000 semillas y no coincide con el ejercicio suelto de la misma semilla', () => {
+  for (let s = 1; s <= 1000; s++) {
+    let sim;
+    assert.doesNotThrow(() => { sim = generarSimulacro({ carta, tablilla, anyo: 2026, semilla: s }); }, `semilla ${s}`);
+    assert.equal(sim.length, 4);
+  }
+  const sim = generarSimulacro({ carta, tablilla, anyo: 2026, semilla: 77 });
+  const suelto = generar('situacion-dos-demoras', ctx(77));
+  assert.notDeepEqual(sim[0].real.situacion, suelto.real.situacion, 'la semilla del simulacro se deriva aparte');
+});
+
+test('estima con abatimiento redacta la banda hacia la que abate', () => {
+  const ej = generar('estima', { ...ctx(3), opciones: { viento: { abatimiento: 6, banda: 'babor' }, corriente: null } });
+  assert.match(ej.enunciado, /hacia babor/);
+  assert.ok(Math.abs(diferenciaAngular(ej.real.rv, ej.real.rumboEfectivo)) + 6 < 1e-6 || Math.abs(diferenciaAngular(ej.real.rv, ej.real.rumboEfectivo) + 6) < 1e-6, 'abatir hacia babor resta grados');
+});
+
+test('validar limpia unidades en minúscula y acepta el menos tipográfico', () => {
+  const ej = generar('rumbo-verdadero-aguja', ctx(2));
+  const r = ej.validar({ rv: `${ej.real.respuesta.rv.toFixed(1)} °`, ra: `${ej.real.respuesta.ra.toFixed(1)}` });
+  assert.equal(r.correcto, true);
+  const m = generar('marea-altura-hora', { ...ctx(2), mareas: JSON.parse(readFileSync(new URL('../data/mareas-didacticas.json', import.meta.url), 'utf8')) });
+  assert.equal(m.validar({ altura: `${m.real.respuesta.altura.toFixed(2)} m` }).correcto, true);
 });
 
 test('puntuar aplica el mínimo de 2 aciertos sobre 4', () => {

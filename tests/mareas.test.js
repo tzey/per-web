@@ -112,6 +112,17 @@ test('marea-hora-minima: la hora devuelta está en un tramo de marea creciente y
   }
 });
 
+test('las horas de los ejercicios de marea caen en límites de sexto, para que los doceavos enteros den la altura exacta', () => {
+  for (const t of ['marea-altura-hora', 'marea-resguardo-paso']) for (let s = 1; s <= 100; s++) {
+    const ej = generar(t, ctx(s));
+    const [ant, des] = ej.real.tramo;
+    const t0 = parsearHora(ant[1]), dur = parsearHora(des[1]) - t0;
+    const sextos = (ej.real.hora - t0) / (dur / 6);
+    assert.ok(Math.abs(sextos - Math.round(sextos)) < 0.02, `${t} ${s}: ${sextos} sextos`);
+    assert.ok(Math.round(sextos) >= 1 && Math.round(sextos) <= 5);
+  }
+});
+
 test('gnss-vs-estima: la discrepancia pedida es la que separa estima y GNSS', () => {
   const ej = generar('gnss-vs-estima', ctx(6));
   assert.ok(ej.real.respuesta.distancia >= 0.3 && ej.real.respuesta.distancia <= 2);

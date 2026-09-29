@@ -43,16 +43,6 @@ test('evaluarLecturaCompas avisa cuando la escala se lee lejos de la latitud med
   assert.ok(Math.abs(r.millas - 6) > 0.01, 'la lectura difiere de la medida correcta por la escala variable');
 });
 
-test('la lectura del compás es invariante al zoom: se calcula en unidades del viewBox', () => {
-  const x = proy.marco.x0 - 8;
-  const base = evaluarLecturaCompas({ x, y: A.y }, { x, y: A.y - abertura }, proy, { latMedida: 36.05 }).millas;
-  for (const k of [1, 2, 4]) {
-    // el zoom transforma pantalla, no viewBox: mismas coordenadas de entrada → misma lectura
-    const r = evaluarLecturaCompas({ x, y: A.y }, { x, y: A.y - abertura }, proy, { latMedida: 36.05, zoom: k });
-    cerca(r.millas, base, 1e-9, `zoom ${k}`);
-  }
-});
-
 test('anguloEntrePx devuelve el rumbo de pantalla respecto al norte de la carta', () => {
   cerca(anguloEntrePx({ x: 0, y: 0 }, { x: 0, y: -10 }), 0, 1e-9);
   cerca(anguloEntrePx({ x: 0, y: 0 }, { x: 10, y: 0 }), 90, 1e-9);

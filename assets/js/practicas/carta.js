@@ -262,13 +262,13 @@ export function pintarCarta(svg, carta, { anyo = new Date().getFullYear() } = {}
     const { x, y } = proy.aPx(t.pos);
     capaObjetos.append(texto(x, y, t.texto, { class: `toponimo ${t.estilo ?? ''}`, 'text-anchor': 'middle' }));
   }
-  // área de pulsación generosa para cada objeto
+  // área de pulsación generosa para cada objeto (getBBox exige el nodo ya insertado)
+  contenido.append(capaObjetos);
   for (const g of capaObjetos.querySelectorAll('.objeto')) {
     const b = g.querySelector('circle, rect, path');
     const bb = b?.getBBox?.();
-    if (bb) g.prepend(el('circle', { class: 'hit', cx: bb.x + bb.width / 2, cy: bb.y + bb.height / 2, r: Math.max(10, bb.width) }));
+    if (bb && (bb.width || bb.height)) g.prepend(el('circle', { class: 'hit', cx: bb.x + bb.width / 2, cy: bb.y + bb.height / 2, r: Math.max(10, bb.width) }));
   }
-  contenido.append(capaObjetos);
 
   // rosa de declinación
   contenido.append(pintarRosa(proy, carta.rosa, anyo));
