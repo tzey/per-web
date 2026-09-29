@@ -1,0 +1,171 @@
+/* ============================================================
+   PER — Prácticas: mesa de carta, instrumentos y panel
+   Se carga junto a main.css solo en practicas.html y mesa.html
+   ============================================================ */
+
+/* ---------- Mesa ---------- */
+
+main.mesa { max-width: none; padding: 1.2rem 1.4rem 3rem; }
+.mesa-cab { display: flex; gap: 1rem; align-items: baseline; flex-wrap: wrap; margin-bottom: .8rem; }
+.mesa-cab h1 { font-size: 1.35rem; margin: 0; }
+.mesa-cab .eyebrow { margin: 0; }
+
+.mesa-grid { display: grid; gap: 1.2rem; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1100px) { .mesa-grid { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; } }
+
+.carta-marco {
+  border: 1px solid var(--linea); background: #fff; position: relative;
+  touch-action: none; user-select: none; overflow: hidden;
+}
+.carta-marco svg { display: block; width: 100%; height: auto; }
+.carta-marco svg text { font-family: var(--sans); pointer-events: none; }
+
+.herramientas {
+  display: flex; gap: .4rem; flex-wrap: wrap; align-items: center;
+  padding: .5rem .6rem; border: 1px solid var(--linea); border-top: 0; background: var(--papel-2);
+  font-family: var(--sans); font-size: .82rem;
+}
+.herramientas .sep { width: 1px; height: 1.4rem; background: var(--linea); margin: 0 .3rem; }
+.herramientas .btn { padding: .3rem .7rem; font-size: .82rem; }
+.herramientas .btn[aria-pressed="true"] { background: var(--tinta); color: #fff; }
+.herramientas .lectura { font-family: var(--mono); color: var(--tinta-70); margin-left: auto; min-width: 12ch; text-align: right; }
+
+.panel-mesa { font-size: .95rem; }
+.panel-mesa .panel { margin: 0 0 1rem; }
+.panel-mesa .panel h3 { font-size: 1rem; }
+.panel-mesa .enunciado { font-weight: 400; }
+.panel-mesa .campos { display: grid; gap: .5rem; margin: .8rem 0; }
+.panel-mesa .campos label { display: grid; grid-template-columns: 9rem 1fr; gap: .5rem; align-items: center; font-family: var(--sans); font-size: .85rem; }
+.panel-mesa .campos input { width: 100%; }
+.panel-mesa .acciones { display: flex; gap: .5rem; flex-wrap: wrap; }
+.panel-mesa .pistas ol { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .9rem; }
+.panel-mesa details summary { cursor: pointer; font-family: var(--sans); font-weight: 600; font-size: .9rem; }
+.panel-mesa .datos { font-family: var(--mono); font-size: .85rem; background: var(--papel-2); padding: .5rem .7rem; border: 1px solid var(--linea-fina); }
+.panel-mesa .datos dl { display: grid; grid-template-columns: auto 1fr; gap: .2rem .8rem; margin: 0; }
+.panel-mesa .datos dt { color: var(--tinta-45); }
+.panel-mesa .datos dd { margin: 0; }
+
+.ficha { position: absolute; right: .6rem; top: .6rem; max-width: 300px; background: var(--papel); border: 1px solid var(--tinta); padding: .7rem .9rem; font-size: .85rem; box-shadow: 0 4px 16px rgba(16,32,43,.15); z-index: 3; }
+.ficha h4 { margin: 0 0 .4rem; color: var(--tinta); font-size: .9rem; }
+.ficha dl { display: grid; grid-template-columns: auto 1fr; gap: .15rem .7rem; margin: 0; }
+.ficha dt { color: var(--tinta-45); font-family: var(--sans); font-size: .75rem; }
+.ficha dd { margin: 0; font-family: var(--mono); font-size: .8rem; }
+.ficha button { position: absolute; right: .3rem; top: .2rem; border: 0; background: none; font-size: 1rem; cursor: pointer; color: var(--tinta-45); }
+
+/* ---------- Simbología de la carta (SVG) ---------- */
+
+.carta-papel { fill: #fff; }
+.agua { fill: #fff; }
+.veril { stroke: #7fb2c9; stroke-width: .8; stroke-linejoin: round; }
+.veril.v50 { fill: #fff; stroke-dasharray: 4 3; }
+.veril.v20 { fill: #eef6fa; }
+.veril.v10 { fill: #dbecf4; }
+.veril.v5  { fill: #c9e4ef; }
+.tierra { fill: var(--tierra); stroke: #7a6a3f; stroke-width: 1.1; stroke-linejoin: round; }
+
+.zona { fill: none; stroke: var(--derrota); stroke-width: .9; }
+.zona.prohibida { fill: rgba(214,0,110,.06); stroke-dasharray: 6 3; }
+.zona.fondeadero { stroke-dasharray: 3 3; }
+.zona.cable { stroke-dasharray: 8 3 2 3; stroke-width: 1.2; }
+.zona.banistas { stroke: var(--amarillo); stroke-dasharray: 4 3; fill: rgba(228,161,27,.08); }
+.zona-etiqueta { font-size: 10px; fill: var(--derrota); font-style: italic; }
+
+.sonda { font-size: 11px; fill: #35525f; font-family: 'IBM Plex Mono', ui-monospace, monospace !important; }
+.sonda .dec { font-size: 8px; }
+.sonda .fondo { font-size: 8px; font-style: italic; fill: #6b7f89; }
+.peligro-prof { fill: #10202b; font-weight: 600; }
+
+.objeto { cursor: pointer; pointer-events: all; }
+.objeto text { pointer-events: all !important; }
+.objeto .hit { fill: transparent; stroke: none; }
+.objeto:focus-visible { outline: none; }
+.objeto:focus-visible > circle, .objeto:focus-visible > path, .objeto:focus-visible > rect { filter: drop-shadow(0 0 3px var(--derrota)); }
+.faro circle { fill: #10202b; }
+.faro .destello { fill: var(--derrota); fill-opacity: .85; }
+.faro.conspicuo .destello { fill-opacity: 1; }
+.etiqueta { font-size: 11px; fill: #10202b; }
+.etiqueta.caracteristica { font-size: 9.5px; font-style: italic; fill: #3d4d57; }
+.etiqueta.luz { font-size: 8.5px; font-style: italic; fill: #3d4d57; }
+.etiqueta.enf { fill: var(--derrota); font-weight: 600; font-size: 10px; }
+.etiqueta.puerto { font-size: 10.5px; font-weight: 600; fill: #3d4d57; }
+.marca path { fill: none; stroke: #10202b; stroke-width: 1.2; }
+.marca circle { fill: #10202b; }
+.boya .destello { fill: none; stroke: var(--derrota); stroke-width: 1; }
+.boya .tope path, .boya .tope rect, .boya .tope circle { fill: #10202b; }
+.peligro circle { fill: none; stroke: #10202b; stroke-width: .9; stroke-dasharray: 2 2; }
+.peligro path { fill: none; stroke: #10202b; stroke-width: 1.2; }
+.peligro.bajo circle { fill: rgba(201,228,239,.6); }
+.enfilacion { stroke: #10202b; stroke-width: .9; stroke-dasharray: 10 4 2 4; }
+.toponimo { font-size: 11px; fill: #3d4d57; font-style: italic; }
+.toponimo.mar { font-size: 16px; letter-spacing: .25em; fill: #6b8592; font-style: normal; }
+
+/* marco graduado */
+.marco-borde { fill: none; stroke: #10202b; stroke-width: 1.2; }
+.marco-exterior { fill: none; stroke: #10202b; stroke-width: .8; }
+.tick { stroke: #10202b; stroke-width: .6; }
+.tick.grado { stroke-width: 1.2; }
+.tick.decima { stroke-width: .4; }
+.grad { font-size: 10px; fill: #10202b; font-variant-numeric: tabular-nums; }
+.grad.grado { font-weight: 700; font-size: 11px; }
+.bandas rect { fill: #10202b; }
+.sello { font-size: 12px; font-weight: 700; fill: var(--derrota); letter-spacing: .12em; }
+
+/* rosa */
+.rosa-ext { fill: none; stroke: #10202b; stroke-width: .8; }
+.rosa-int { fill: none; stroke: #10202b; stroke-width: .4; }
+.rosa .tick { stroke: #10202b; }
+.rosa-num { font-size: 10px; fill: #10202b; }
+.norte-v { stroke: #10202b; stroke-width: 1.2; fill: #10202b; }
+.norte-m { stroke: var(--derrota); stroke-width: 1; fill: var(--derrota); }
+.rosa-texto { font-size: 10px; fill: var(--derrota); font-weight: 600; }
+
+/* cartucho */
+.cartucho rect { fill: #fff; stroke: #10202b; stroke-width: 1; }
+.cartucho text { font-size: 10px; fill: #10202b; }
+.cartucho .cartucho-titulo { font-size: 14px; font-weight: 700; }
+.cartucho .cartucho-sub { font-style: italic; fill: #3d4d57; }
+.cartucho .cartucho-sello { font-weight: 700; fill: var(--derrota); letter-spacing: .06em; }
+
+/* ---------- Instrumentos ---------- */
+
+.capa-instrumentos * { vector-effect: non-scaling-stroke; }
+.instrumento { cursor: grab; }
+.instrumento:active { cursor: grabbing; }
+.instrumento:focus { outline: none; }
+.instrumento:focus .asa, .instrumento:focus .cuerpo { stroke: var(--derrota); }
+.compas .brazo { stroke: #5b6770; stroke-width: 3; stroke-linecap: round; }
+.compas .punta { fill: #10202b; stroke: #fff; stroke-width: 1; cursor: move; }
+.compas .punta.activa { fill: var(--derrota); }
+.compas .medida { font-size: 11px; fill: var(--derrota); font-weight: 600; }
+.transportador .cuerpo { fill: rgba(255,255,255,.55); stroke: #10202b; stroke-width: 1; }
+.transportador .tick { stroke: #10202b; }
+.transportador .num { font-size: 9px; fill: #10202b; }
+.transportador .regla { fill: rgba(228,161,27,.18); stroke: #b98614; stroke-width: 1; }
+.transportador .asa { fill: var(--derrota); stroke: #fff; stroke-width: 1.5; cursor: grab; }
+.transportador .indice { stroke: var(--derrota); stroke-width: 1.5; }
+.transportador .lectura { font-size: 12px; fill: var(--derrota); font-weight: 700; }
+
+/* trazos de lápiz */
+.capa-trazos * { vector-effect: non-scaling-stroke; }
+.trazo { stroke: #333; stroke-width: 1.2; fill: none; }
+.trazo.previo { stroke-dasharray: 4 3; stroke: #888; }
+.trazo-punto { fill: none; stroke: #333; stroke-width: 1.2; }
+.trazo-punto.observada { fill: #333; }
+.trazo-etiqueta { font-size: 10px; fill: #333; font-family: 'IBM Plex Mono', ui-monospace, monospace !important; }
+.capa-solucion .trazo { stroke: var(--derrota); stroke-dasharray: 6 3; }
+.capa-solucion .trazo-punto { stroke: var(--derrota); }
+.capa-solucion .trazo-etiqueta { fill: var(--derrota); }
+
+/* ---------- Portada de prácticas ---------- */
+
+.bloques { display: grid; gap: 1px; background: var(--linea); border: 1px solid var(--linea); margin: 1.4rem 0; }
+@media (min-width: 720px) { .bloques { grid-template-columns: repeat(2, 1fr); } }
+.bloque { background: var(--papel); padding: 1.1rem 1.2rem; }
+.bloque h3 { margin: 0 0 .3rem; font-size: 1rem; display: flex; justify-content: space-between; gap: .5rem; }
+.bloque h3 .estado { font-family: var(--mono); font-size: .75rem; color: var(--tinta-45); font-weight: 400; }
+.bloque p { font-size: .9rem; color: var(--tinta-70); margin: 0 0 .6rem; }
+.bloque ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .4rem; }
+.bloque li { margin: 0; }
+.bloque li a { font-family: var(--sans); font-size: .82rem; text-decoration: none; border: 1px solid var(--linea); padding: .25rem .6rem; border-radius: var(--r); color: var(--tinta); display: inline-block; }
+.bloque li a:hover { background: var(--papel-2); }
+.bloque li a .hecho { color: var(--estribor); }

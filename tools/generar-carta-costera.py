@@ -186,7 +186,7 @@ carta = {
     "zonas": zonas,
     "puertos": puertos,
     "toponimos": [
-        {"texto": "ESTRECHO DE ALCARAVÁN", "pos": [35.965, -12.56], "estilo": "mar"},
+        {"texto": "ESTRECHO DE ALCARAVÁN", "pos": [35.945, -12.47], "estilo": "mar"},
         {"texto": "Punta Grulla", "pos": aguaN(-12.93, 0.012), "estilo": "costa"},
         {"texto": "Cabo Alcotán", "pos": aguaN(-12.36, 0.012), "estilo": "costa"},
         {"texto": "Cabo Sisón", "pos": aguaS(-12.80, 0.012), "estilo": "costa"},

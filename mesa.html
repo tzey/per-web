@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesa de carta · PER</title>
+<meta name="theme-color" content="#10202B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/css/main.css">
+<link rel="stylesheet" href="assets/css/practicas.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" data-rail></nav>
+  <main class="mesa">
+    <div class="mesa-cab">
+      <p class="eyebrow" id="cabEyebrow">Prácticas · carta didáctica</p>
+      <h1 id="cabTitulo">Mesa de carta</h1>
+      <span class="reloj" id="reloj" hidden>20:00</span>
+    </div>
+
+    <div class="mesa-grid">
+      <div>
+        <div class="carta-marco" id="cartaMarco">
+          <svg id="carta" xmlns="http://www.w3.org/2000/svg" aria-label="Carta didáctica interactiva"></svg>
+        </div>
+        <div class="herramientas" id="herramientas" role="toolbar" aria-label="Instrumentos"></div>
+      </div>
+
+      <aside class="panel-mesa" id="panel">
+        <div class="panel"><h3>Cargando carta…</h3><p class="mono" id="estadoCarga">Leyendo datos.</p></div>
+      </aside>
+    </div>
+
+    <footer class="pie">
+      <p>Carta didáctica de geografía ficticia. No sirve para navegar. Los ejercicios se generan con semilla y se corrigen con tolerancias acordes a la escala. Nada de lo que hagas aquí acredita prácticas reglamentarias.</p>
+    </footer>
+  </main>
+</div>
+<script type="module" src="assets/js/practicas/mesa.js"></script>
+</body>
+</html>
