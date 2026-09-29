@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prácticas de carta · PER</title>
+<meta name="description" content="Mesa de carta interactiva con compás de puntas, transportador y ejercicios generados de la UT11 del PER: coordenadas, rumbos, corrección total, estima, situación, mareas y fondeo.">
+<meta name="theme-color" content="#10202B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/css/main.css">
+<link rel="stylesheet" href="assets/css/practicas.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" data-rail></nav>
+  <main>
+    <p class="eyebrow">Prácticas · carta didáctica</p>
+    <h1>Mesa de carta con compás, transportador y ejercicios que no se repiten.</h1>
+    <p class="entradilla">Los ejercicios se generan con semilla sobre una carta didáctica de geografía ficticia. En aprendizaje tienes pistas, lecturas y solución trazada; en el simulacro, reloj y cuatro ejercicios encadenados corregidos con el mínimo del baremo.</p>
+
+    <div class="nota aviso">
+      <b>Qué es y qué no es</b>
+      <p>Sirve para entrenar el trazado y el razonamiento de la UT11 y para ensayar mareas, GNSS y fondeo. No acredita horas de prácticas reglamentarias, no sustituye al curso de radio y la carta no vale para navegar.</p>
+    </div>
+
+    <h2>Simulacro de carta</h2>
+    <div class="panel" style="margin-top:1rem">
+      <h3>Cuatro ejercicios encadenados, como en el examen</h3>
+      <p style="font-size:.93rem">Situación por dos demoras, rumbo verdadero y de aguja, estima y distancia con hora de llegada. Sin pistas, sin lecturas numéricas, sin calculadora. Necesitas 2 de 4.</p>
+      <div class="barra" style="margin:.6rem 0">
+        <label class="sans" style="font-size:.9rem">Tiempo
+          <select id="minutos"><option value="15">15 min</option><option value="20" selected>20 min</option><option value="30">30 min</option><option value="45">45 min</option></select>
+        </label>
+        <button class="btn acc" id="empezarSimulacro">Empezar simulacro</button>
+      </div>
+      <div id="historialSimulacros"></div>
+    </div>
+
+    <h2>Ejercicios por bloque</h2>
+    <div id="bloques" class="bloques"><p class="mono" style="padding:1rem">Cargando…</p></div>
+
+    <h2>Tu progreso en prácticas</h2>
+    <div id="progresoPracticas"></div>
+
+    <footer class="pie">
+      <p>Carta didáctica de geografía ficticia con sello visible. Los procedimientos siguen el Anexo II del RD 875/2014 (UT10 y UT11). El modo simulacro no incluye viento ni corriente, como los ejercicios de rumbo y estima del examen.</p>
+    </footer>
+  </main>
+</div>
+
+<script type="module">
+import { pintarRail } from './assets/js/comun.js';
+import { TIPOS } from './assets/js/practicas/ejercicios.js';
+import { leerHistorial, resumenHistorial, CLAVE_PRACTICAS } from './assets/js/practicas/sesion.js';
+pintarRail('practicas.html');
+
+const $ = s => document.querySelector(s);
+const semilla = () => Math.floor(Math.random() * 9000 + 1000);
+$('#empezarSimulacro').onclick = () => location.href = `mesa.html?modo=examen&semilla=${semilla()}&minutos=${$('#minutos').value}`;
+
+const historial = leerHistorial();
+const resumen = resumenHistorial(historial);
+
+const BLOQUES = [
+  { id: 'carta', titulo: 'Carta · UT11', texto: 'Coordenadas, distancias, rumbos, corrección total, estima y situación sobre la carta costera.', carta: 'estrecho-didactico' },
+  { id: 'mareas', titulo: 'Mareas y sonda', texto: 'Altura de marea a una hora, profundidad real y resguardo bajo la quilla, hora límite para pasar un bajo.', carta: 'estrecho-didactico' },
+  { id: 'gnss', titulo: 'GNSS', texto: 'Comparar la posición del receptor con la estima y las observaciones; waypoint y hombre al agua.', carta: 'estrecho-didactico' },
+  { id: 'fondeo', titulo: 'Fondeo · portulano', texto: 'Radio de borneo, bajamar y garreo sobre el plano del puerto a gran escala.', carta: 'puerto-didactico' }
+];
+
+$('#bloques').innerHTML = BLOQUES.map(b => {
+  const tipos = TIPOS.filter(t => t.bloque === b.id);
+  const hechos = tipos.filter(t => resumen.porTipo[t.id]?.aciertos > 0).length;
+  return `<div class="bloque">
+    <h3>${b.titulo}<span class="estado">${tipos.length ? `${hechos}/${tipos.length} resueltos` : 'en preparación'}</span></h3>
+    <p>${b.texto}</p>
+    ${tipos.length ? `<ul>${tipos.map(t => {
+      const r = resumen.porTipo[t.id];
+      return `<li><a href="mesa.html?tipo=${t.id}&carta=${b.carta}&semilla=${semilla()}">${r?.aciertos ? '<span class="hecho">✓</span> ' : ''}${t.titulo}${r ? ` <span class="mono" style="color:var(--tinta-45)">${r.aciertos}/${r.intentos}</span>` : ''}</a></li>`;
+    }).join('')}</ul>` : '<p style="font-size:.85rem;color:var(--tinta-45);margin:0">Llegará con la siguiente entrega.</p>'}
+  </div>`;
+}).join('');
+
+const sims = historial.resultados.filter(r => r.modo === 'examen');
+$('#historialSimulacros').innerHTML = sims.length
+  ? `<div class="racha">${sims.slice(0, 20).reverse().map(r => `<i class="${r.apto ? 'apto' : 'no'}" title="${new Date(r.fecha).toLocaleDateString('es-ES')} · semilla ${r.semilla}">${r.aciertos}</i>`).join('')}</div>
+     <p style="font-size:.9rem;margin:.4rem 0 0">${sims.length} simulacro${sims.length > 1 ? 's' : ''} · ${resumen.simulacros.aptos} apto${resumen.simulacros.aptos !== 1 ? 's' : ''}. Último: ${sims[0].aciertos} de ${sims[0].total}, ${sims[0].apto ? 'apto' : 'no apto'}${sims[0].porTiempo ? ' (por tiempo)' : ''}.</p>`
+  : '<p style="font-size:.9rem;margin:0;color:var(--tinta-70)">Todavía no has hecho ningún simulacro de carta.</p>';
+
+const totalIntentos = historial.resultados.length;
+$('#progresoPracticas').innerHTML = totalIntentos
+  ? `<div class="panel"><h3>${totalIntentos} ejercicio${totalIntentos > 1 ? 's' : ''} comprobado${totalIntentos > 1 ? 's' : ''}</h3>
+     <p style="font-size:.93rem">${Object.entries(resumen.porTipo).map(([t, r]) => `${TIPOS.find(x => x.id === t)?.titulo ?? t}: ${r.aciertos}/${r.intentos}`).join(' · ')}</p>
+     <p style="margin:0"><button class="btn sec" id="borrar">Borrar historial de prácticas</button></p></div>`
+  : `<div class="panel"><h3>Sin ejercicios todavía</h3><p style="font-size:.93rem;margin:0">El historial se guarda en este navegador. Empieza por «Coordenadas de un objeto» para conocer la carta y sigue en orden.</p></div>`;
+$('#borrar')?.addEventListener('click', () => {
+  if (confirm('Se borrará el historial de prácticas guardado en este navegador. ¿Continuar?')) { localStorage.removeItem(CLAVE_PRACTICAS); location.reload(); }
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

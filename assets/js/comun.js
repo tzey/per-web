@@ -117,6 +117,14 @@ export function pintarRail(actual) {
     </div>
 
     <div class="rail-grupo">
+      <p>Prácticas</p>
+      <ol>
+        ${enlace('practicas.html', '·', 'Prácticas de carta')}
+        ${enlace('mesa.html', '·', 'Mesa de carta')}
+      </ol>
+    </div>
+
+    <div class="rail-grupo">
       <p>Bloque PNB · 27 preguntas</p>
       <ol>
         ${UNIDADES.filter(u => u.bloque === 'PNB').map(u =>

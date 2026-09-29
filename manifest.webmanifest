@@ -1,7 +1,7 @@
 {
   "name": "PER · Teoría y simulador",
   "short_name": "PER",
-  "description": "Temario, taller de carta y simulador del examen del Patrón de Embarcaciones de Recreo.",
+  "description": "Temario, taller de carta, mesa de carta interactiva y simulador del examen del Patrón de Embarcaciones de Recreo.",
   "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
