@@ -3,9 +3,9 @@
    enunciado, pistas, solución, comprobación y lecturas.
    ============================================================ */
 
-import { pintarRail, UNIDADES } from '../comun.js';
+import { pintarRail, UNIDADES, hhmmss } from '../comun.js';
 import { pintarCarta, crearZoomPan, fichaObjeto, buscarObjeto, dibujarTrazo } from './carta.js';
-import { generar, TIPOS } from './ejercicios.js';
+import { generar, generarSimulacro, puntuar, TIPOS } from './ejercicios.js';
 import { formatearGrados, formatearAngulo, formatearMillas } from './geo.js';
 import { crearCompasPuntas, crearTransportador, crearLapiz } from './instrumentos.js';
 import { crearSesion, sesionPrevia, registrarResultado } from './sesion.js';
@@ -348,8 +348,88 @@ async function iniciar() {
   estado.zoom = crearZoomPan(svg, estado.vista.mundo, { esFondo: t => !estado.lapiz?.modo() && !t.closest('.capa-instrumentos, .capa-trazos, .objeto') });
   activarFichas();
   pintarHerramientas();
+  if (estado.modo === 'examen') { iniciarExamen(); return; }
   if (!TIPOS.some(t => t.id === estado.tipo && t.cartas.includes(estado.carta.meta.tipo))) estado.tipo = TIPOS.find(t => t.cartas.includes(estado.carta.meta.tipo)).id;
   cargarEjercicio();
+}
+
+/* ---------- Modo examen ---------- */
+
+const examen = { ejercicios: [], respuestas: {}, timer: null, restante: 0, entregado: false };
+
+function iniciarExamen() {
+  const minutos = Math.max(5, Math.min(90, +(params.get('minutos') ?? 20)));
+  examen.ejercicios = generarSimulacro({ carta: estado.carta, tablilla: estado.tablilla, anyo: estado.anyo, semilla: estado.semilla });
+  estado.sesion = crearSesion({ modo: 'examen', cartaId: estado.cartaId, versionCarta: estado.carta.version,
+    ejercicios: examen.ejercicios.map(e => ({ id: e.id, tipo: e.tipo, semilla: e.semilla })) });
+  // sin ayudas: lecturas, pistas y condiciones fuera
+  estado.lecturas = false;
+  $('#btnLecturas').disabled = true; $('#btnLecturas').title = 'Sin lecturas numéricas en el simulacro';
+  estado.compas.mostrarLectura(false); estado.transportador.mostrarLectura(false); estado.lapiz.mostrarLectura(false);
+  const ut = UNIDADES.find(u => u.id === 'ut11');
+  $('#cabEyebrow').textContent = `Simulacro · UT ${ut.n} · ${ut.titulo} · semilla ${estado.semilla}`;
+  $('#cabTitulo').textContent = 'Cuatro ejercicios encadenados';
+  const reloj = $('#reloj'); reloj.hidden = false;
+  examen.restante = minutos * 60;
+  const pinta = () => { reloj.textContent = hhmmss(examen.restante); reloj.classList.toggle('urgente', examen.restante <= 120); };
+  pinta();
+  examen.timer = setInterval(() => { examen.restante--; pinta(); if (examen.restante <= 0) entregarExamen(true); }, 1000);
+  destacar(examen.ejercicios.flatMap(objetosDelEjercicio));
+  $('#panel').innerHTML = `
+    <div class="nota examen"><b>Condiciones del simulacro</b><p>${minutos} minutos, sin pistas, sin lecturas numéricas ni calculadora. Cada ejercicio parte del resultado del anterior, pero puntúa por separado. Necesitas 2 de 4.</p></div>
+    ${examen.ejercicios.map((ej, i) => `
+      <div class="panel ejercicio" data-ej="${ej.id}">
+        <h3><span class="mono" style="color:var(--tinta-45)">${i + 1}/4</span> ${ej.titulo}</h3>
+        <p class="enunciado">${ej.enunciado}</p>
+        <div class="datos"><dl>${describirVisibles(ej).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></div>
+        <div class="campos">
+          ${ej.campos.map(c => `<label>${c.etiqueta}<input type="text" inputmode="${c.tipo === 'hora' ? 'numeric' : 'decimal'}" data-ej-campo="${ej.id}" data-campo="${c.id}" placeholder="${marcador(c)}" autocomplete="off"></label>`).join('')}
+        </div>
+      </div>`).join('')}
+    <div class="barra"><button class="btn acc" id="entregar">Entregar</button><a class="btn sec" href="practicas.html">Salir sin entregar</a></div>
+    <div id="resultadoExamen"></div>`;
+  $('#entregar').onclick = () => entregarExamen(false);
+  window.addEventListener('beforeunload', ev => {
+    if (!examen.entregado && document.querySelectorAll('[data-ej-campo]').length && [...document.querySelectorAll('[data-ej-campo]')].some(i => i.value)) { ev.preventDefault(); ev.returnValue = ''; }
+  });
+}
+
+function entregarExamen(porTiempo) {
+  if (examen.entregado) return;
+  const respuestas = {};
+  document.querySelectorAll('[data-ej-campo]').forEach(i => { (respuestas[i.dataset.ejCampo] ??= {})[i.dataset.campo] = i.value; });
+  const sinResponder = examen.ejercicios.filter(e => !e.campos.every(c => (respuestas[e.id]?.[c.id] ?? '').trim())).length;
+  if (!porTiempo && sinResponder && !confirm(`Hay ${sinResponder} ejercicio${sinResponder > 1 ? 's' : ''} sin completar. ¿Entregar igualmente?`)) return;
+  examen.entregado = true;
+  clearInterval(examen.timer);
+  document.querySelectorAll('[data-ej-campo]').forEach(i => i.disabled = true);
+  $('#entregar').disabled = true;
+  const r = puntuar(examen.ejercicios, respuestas);
+  examen.ejercicios.forEach(e => estado.sesion.registrarRespuesta(e.id, respuestas[e.id] ?? {}, e.validar(respuestas[e.id] ?? {})));
+  estado.sesion.terminar({ tipo: 'simulacro', semilla: estado.semilla, aciertos: r.aciertos, total: r.total, apto: r.apto, detalle: r.detalle, porTiempo });
+  $('#resultadoExamen').innerHTML = `
+    <div class="veredicto ${r.apto ? 'apto' : 'no-apto'}">
+      <h2>${r.apto ? 'Apto' : 'No apto'}</h2>
+      <p class="cifra">${r.aciertos}<span style="font-size:1rem;font-family:var(--sans)"> aciertos de ${r.total}</span></p>
+      <p style="margin:.6rem 0 0">El mínimo son 2 de 4.${porTiempo ? ' Se acabó el tiempo.' : ''}</p>
+    </div>
+    <div class="barra"><button class="btn" id="revisarExamen">Ver soluciones</button><a class="btn sec" href="mesa.html?modo=examen&semilla=${Math.floor(Math.random() * 9000 + 1000)}">Otro simulacro</a><a class="btn sec" href="practicas.html">Volver a prácticas</a></div>`;
+  $('#revisarExamen').onclick = () => {
+    examen.ejercicios.forEach((e, i) => {
+      const v = e.validar(respuestas[e.id] ?? {});
+      const bloque = document.querySelector(`[data-ej="${e.id}"]`);
+      const div = document.createElement('div');
+      div.className = 'explica';
+      div.style.borderLeftColor = v.correcto ? 'var(--estribor)' : 'var(--babor)';
+      div.innerHTML = `<b>${v.correcto ? 'Acierto' : 'Fallo'}.</b> ${v.detalle.map(d => { const c = e.campos.find(x => x.id === d.campo); return `${c.etiqueta}: esperado <span class="mono">${formatearValor(c, d.esperado)}</span>${d.dado === null ? ' (sin respuesta)' : d.dentro ? '' : ` (error ${formatearError(c, d.error)})`}`; }).join(' · ')}
+        ${v.avisos.map(a => `<p style="margin:.4rem 0 0"><b>Aviso:</b> ${AVISOS[a] ?? a}</p>`).join('')}
+        <ol style="margin:.5rem 0 0;padding-left:1.1rem">${e.solucion.map(p => `<li>${p.texto}</li>`).join('')}</ol>`;
+      bloque.append(div);
+      e.solucion.forEach(p => p.trazo && dibujarTrazo(estado.vista.capas.solucion, estado.vista.proyeccion, p.trazo));
+    });
+    $('#revisarExamen').disabled = true;
+  };
+  $('#resultadoExamen').scrollIntoView({ behavior: 'smooth' });
 }
 
 iniciar();
